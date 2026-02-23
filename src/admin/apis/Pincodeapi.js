@@ -16,12 +16,13 @@ export const createPincode = (data) => {
   );
 };
 
-// ✅ Get All Pincodes
-export const getPincodes = () => {
-  return apiConnector(
-    "GET",
-    pincodeEndpoints.GET_PINCODES
-  );
+// ✅ Get All Pincodes (with pagination and search support)
+export const getPincodes = (page = 1, limit = 10, search = "") => {
+  let url = `${pincodeEndpoints.GET_PINCODES}?page=${page}&limit=${limit}`;
+  if (search && search.trim()) {
+    url += `&search=${encodeURIComponent(search.trim())}`;
+  }
+  return apiConnector("GET", url);
 };
 
 // ✅ Update Pincode (send pincode in URL like backend expects)

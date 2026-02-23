@@ -2,7 +2,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-
+import { jwtDecode } from "jwt-decode";
 import { verifyOtp } from '../../apis/Authapi';
 import {
   setLoading,
@@ -73,56 +73,83 @@ export default function OTP() {
     }
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    const otpValue = otp.join('');
-    console.log("Submitting OTP:", otpValue, "for user:", userId);
+ const handleSubmit = async (e) => {
+  e.preventDefault();
+  const otpValue = otp.join('');
 
-    if (otpValue.length !== 6) {
-      setIsValid(false);
-      console.log("OTP invalid length:", otpValue.length);
-      return;
-    }
+  if (otpValue.length !== 6) {
+    setIsValid(false);
+    return;
+  }
 
-    dispatch(clearError());
-    dispatch(setLoading(true));
-    setIsValid(true);
-    setIsSubmitting(true);
+  dispatch(clearError());
+  dispatch(setLoading(true));
+  setIsValid(true);
+  setIsSubmitting(true);
 
-    try {
-      const res = await verifyOtp({ userId, otp: otpValue });
-      console.log("OTP verification response:", res);
+  try {
+    const res = await verifyOtp({ userId, otp: otpValue });
 
-      if (res.success) {
-        console.log("OTP verified successfully!");
+    if (res.success) {
 
-        // Save tokens in Redux
-        dispatch(setToken({
-          accessToken: res.data.accessToken,
-          refreshToken: res.data.refereshToken
-        }));
-        console.log("Tokens stored in Redux:", res.data.accessToken, res.data.refereshToken);
+      const accessToken = res.data.accessToken;
+      const refreshToken = res.data.refereshToken;
 
-        // Optional: also save in localStorage
-        localStorage.setItem('token', res.data.accessToken);
-        localStorage.setItem('refreshToken', res.data.refereshToken);
-        console.log("Tokens stored in localStorage");
+      // ✅ Store in Redux
+      dispatch(setToken({ accessToken, refreshToken }));
 
-        navigate('/admin/dashboard');
-      } else {
-        console.log("OTP verification failed:", res.message);
-        setIsValid(false);
-        dispatch(setError(res.message));
+      // ✅ Store in localStorage
+      localStorage.setItem('token', accessToken);
+      localStorage.setItem('refreshToken', refreshToken);
+
+      // ✅ Decode JWT to get role
+      const decoded = jwtDecode(accessToken);
+      console.log("Decoded Token:", decoded);
+
+      const role = decoded?.role?.toUpperCase();
+
+      if (!role) {
+        throw new Error("Role not found in token");
       }
-    } catch (err) {
-      console.error("Error verifying OTP:", err);
+
+      // ✅ Store role
+      localStorage.setItem('userRole', role);
+
+      console.log("Stored role:", role);
+
+      // ✅ Dynamic Redirect Based on Role
+      switch (role) {
+        case "ADMIN":
+        case "SUBADMIN":
+          navigate('/admin/dashboard', { replace: true });
+          break;
+
+        case "INFLUENCER":
+          navigate('/influencer/dashboard', { replace: true });
+          break;
+
+        case "DRIVER":
+          navigate('/driver/dashboard', { replace: true });
+          break;
+
+        default:
+          navigate('/login', { replace: true });
+      }
+
+    } else {
       setIsValid(false);
-      dispatch(setError(err));
-    } finally {
-      dispatch(setLoading(false));
-      setIsSubmitting(false);
+      dispatch(setError(res.message));
     }
-  };
+
+  } catch (err) {
+    console.error("Error verifying OTP:", err);
+    setIsValid(false);
+    dispatch(setError(err.message || "Verification failed"));
+  } finally {
+    dispatch(setLoading(false));
+    setIsSubmitting(false);
+  }
+};
 
   const handleResend = () => {
     setOtp(['', '', '', '', '', '']);

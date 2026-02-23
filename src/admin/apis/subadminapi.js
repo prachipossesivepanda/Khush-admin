@@ -18,16 +18,22 @@ export const getSubAdmins = (
   page = 1,
   limit = 10,
   search = "",
-   isActive = true
+  isActive
 ) => {
-  const queryParams = new URLSearchParams({
-    page,
-    limit,
-    search,
-    isActive,
-  });
+  const queryParams = new URLSearchParams();
 
-  console.log("📥 Fetching SubAdmins");
+  queryParams.append("page", page);
+  queryParams.append("limit", limit);
+
+  if (search) {
+    queryParams.append("search", search);
+  }
+
+  if (isActive !== undefined) {
+    queryParams.append("isActive", isActive);
+  }
+
+  console.log("📥 Fetching SubAdmins:", queryParams.toString());
 
   return apiConnector(
     "GET",

@@ -1,6 +1,7 @@
 // src/admin/components/Subcategories/Subcategories.jsx
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { ZoomIn, X, Search, Plus, ArrowLeft, Edit } from "lucide-react";
 import {
   getSubcategoriesByCategory,
   toggleSubcategoryActiveStatus,
@@ -16,6 +17,25 @@ export default function Subcategories() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
+  const [zoomedImage, setZoomedImage] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+
+  // Debounce search term to avoid too many API calls
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 500); // Wait 500ms after user stops typing
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Reset to page 1 when search term changes
+  useEffect(() => {
+    if (debouncedSearchTerm !== searchTerm) {
+      setCurrentPage(1);
+    }
+  }, [debouncedSearchTerm]);
 
   useEffect(() => {
     if (!categoryId) {
@@ -23,14 +43,14 @@ export default function Subcategories() {
       setLoading(false);
       return;
     }
-    fetchSubcategories(1);
-  }, [categoryId]);
+    fetchSubcategories(currentPage);
+  }, [categoryId, currentPage, debouncedSearchTerm]);
 
-  const fetchSubcategories = async (page = 1, limit = 12) => {
+  const fetchSubcategories = async (page = 1, limit = 10) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await getSubcategoriesByCategory(categoryId, page, limit);
+      const res = await getSubcategoriesByCategory(categoryId, page, limit, debouncedSearchTerm);
       const data = res.data?.data || res.data || {};
       const subs = data.subcategories || data.subCategories || data || [];
       const pag = data.pagination || null;
@@ -53,12 +73,6 @@ export default function Subcategories() {
       setLoading(false);
     }
   };
-
-  const filtered = subcategories.filter(
-    (s) =>
-      s.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      s.description?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
 
   // Handlers
   const openCreate = () => {
@@ -95,116 +109,127 @@ export default function Subcategories() {
   // Render
   return (
     <div className="w-full min-h-screen bg-white">
-      <header className="sticky top-0 z-20 bg-white border-b border-gray-200 shadow-sm">
-        <div className="px-4 sm:px-5 lg:px-6 py-3 sm:py-4">
-          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-black tracking-tight">
+      <header className="sticky top-0 z-20 bg-white border-b border-gray-200">
+        <div className="px-4 sm:px-6 py-4">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">
             Subcategories
           </h1>
         </div>
       </header>
 
-      <main className="px-4 sm:px-5 lg:px-6 py-4 sm:py-6 bg-white">
-        {/* Controls */}
-        <div className="flex flex-col gap-3 mb-6">
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-            <button
-              onClick={() => navigate("/admin/inventory/categories")}
-              className="px-3 sm:px-4 py-2 sm:py-2.5 bg-white border-2 border-black text-black rounded-lg sm:rounded-xl hover:bg-black hover:text-white transition flex items-center justify-center gap-2 shadow-sm text-sm sm:text-base font-medium"
-            >
-              <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-              Back
-            </button>
+      {/* Static Search Bar */}
+      <div className="sticky top-16 z-20 bg-white border-b border-gray-200 px-4 sm:px-6 py-4">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          <button
+            onClick={() => navigate("/admin/inventory/categories")}
+            className="inline-flex items-center gap-2 px-4 py-2.5 bg-white border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 hover:border-gray-400 transition-all shadow-sm text-sm font-semibold"
+          >
+            <ArrowLeft size={18} />
+            <span>Back</span>
+          </button>
 
-            <div className="relative flex-1">
-              <input
-                type="text"
-                placeholder="Search subcategories..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 sm:pl-10 pr-4 py-2 sm:py-2.5 text-sm sm:text-base bg-white border-2 border-black rounded-lg sm:rounded-xl shadow-sm focus:border-black focus:ring-2 focus:ring-black/20 transition-all outline-none text-black placeholder-gray-500"
-              />
-              <svg
-                className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 sm:h-5 sm:w-5 text-gray-500"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-            </div>
-
-            <button
-              onClick={openCreate}
-              className="px-4 sm:px-5 py-2 sm:py-2.5 bg-black hover:bg-gray-900 text-white text-sm sm:text-base font-semibold rounded-lg sm:rounded-xl shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-1.5 w-full sm:w-auto"
-            >
-              <span className="text-base sm:text-lg leading-none">+</span>
-              New Subcategory
-            </button>
+          <div className="relative flex-1">
+            <input
+              type="text"
+              placeholder="Search subcategories..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 text-sm bg-white border-2 border-gray-300 rounded-lg shadow-sm focus:border-black focus:ring-2 focus:ring-black/20 transition-all outline-none text-gray-900 placeholder-gray-400"
+            />
+            <Search
+              className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400"
+              size={20}
+            />
           </div>
+
+          <button
+            onClick={openCreate}
+            className="inline-flex items-center gap-2 px-5 py-2.5 bg-black hover:bg-gray-900 text-white text-sm font-semibold rounded-lg shadow-sm hover:shadow-md transition-all w-full sm:w-auto"
+          >
+            <Plus size={18} />
+            <span>New Subcategory</span>
+          </button>
         </div>
+      </div>
+
+      <main className="px-4 sm:px-6 py-6 bg-gray-50/50">
 
         {error && (
-          <div className="mb-6 p-4 bg-red-50 border-2 border-red-500 text-red-700 rounded-xl text-sm font-medium">
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
             {error}
           </div>
         )}
 
         {/* Table */}
-        <div className="bg-white border-2 border-black rounded-lg sm:rounded-xl shadow-lg overflow-hidden">
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-black">
+              <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-3 sm:px-5 py-3 sm:py-3.5 text-left text-xs font-bold text-white uppercase tracking-wider">#</th>
-                  <th className="px-3 sm:px-5 py-3 sm:py-3.5 text-left text-xs font-bold text-white uppercase tracking-wider hidden sm:table-cell">Order</th>
-                  <th className="px-3 sm:px-5 py-3 sm:py-3.5 text-left text-xs font-bold text-white uppercase tracking-wider">Image</th>
-                  <th className="px-3 sm:px-5 py-3 sm:py-3.5 text-left text-xs font-bold text-white uppercase tracking-wider">Name</th>
-                  <th className="px-5 py-3.5 text-left text-xs font-bold text-white uppercase tracking-wider hidden lg:table-cell">Description</th>
-                  <th className="px-3 sm:px-5 py-3 sm:py-3.5 text-center text-xs font-bold text-white uppercase tracking-wider">Active</th>
-                  <th className="px-3 sm:px-5 py-3 sm:py-3.5 text-center text-xs font-bold text-white uppercase tracking-wider hidden md:table-cell">Navbar</th>
-                  <th className="px-3 sm:px-5 py-3 sm:py-3.5 text-right text-xs font-bold text-white uppercase tracking-wider">Actions</th>
+                  <th className="px-4 py-3.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">#</th>
+                  <th className="px-4 py-3.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider hidden sm:table-cell">Order</th>
+                  <th className="px-4 py-3.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Image</th>
+                  <th className="px-4 py-3.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider">Name</th>
+                  <th className="px-5 py-3.5 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider hidden lg:table-cell">Description</th>
+                  <th className="px-4 py-3.5 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider">Status</th>
+                  <th className="px-4 py-3.5 text-center text-xs font-semibold text-gray-700 uppercase tracking-wider hidden md:table-cell">Navbar</th>
+                  <th className="px-4 py-3.5 text-right text-xs font-semibold text-gray-700 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="bg-white divide-y divide-gray-100">
                 {loading ? (
                   <tr>
                     <td colSpan={8} className="px-5 py-16 text-center text-gray-500">
-                      Loading...
+                      <div className="inline-flex items-center gap-3">
+                        <div className="w-6 h-6 border-2 border-gray-300 border-t-black rounded-full animate-spin"></div>
+                        <span>Loading subcategories...</span>
+                      </div>
                     </td>
                   </tr>
-                ) : filtered.length === 0 ? (
+                ) : subcategories.length === 0 ? (
                   <tr>
                     <td colSpan={8} className="px-5 py-16 text-center text-gray-500 italic">
-                      {searchTerm ? "No matching subcategories..." : "No subcategories yet."}
+                      {debouncedSearchTerm ? "No matching subcategories found..." : "No subcategories yet."}
                     </td>
                   </tr>
                 ) : (
-                  filtered.map((sub, i) => (
-                    <tr key={sub._id} className="group hover:bg-gray-100 transition-colors duration-150 border-b border-gray-200">
-                      <td className="px-3 sm:px-5 py-3 sm:py-4 text-xs sm:text-sm text-black font-medium">{i + 1}</td>
-                      <td className="px-3 sm:px-5 py-3 sm:py-4 text-xs sm:text-sm font-semibold text-black hidden sm:table-cell">{sub.sortOrder || "—"}</td>
-                      <td className="px-3 sm:px-5 py-3 sm:py-4">
-                        <div className="h-8 w-8 sm:h-11 sm:w-11 rounded-lg overflow-hidden bg-gray-100 border border-gray-200 shadow-sm">
+                  subcategories.map((sub, i) => (
+                    <tr key={sub._id} className="group hover:bg-gray-50/70 transition-colors duration-150">
+                      <td className="px-4 py-4 text-sm text-gray-600">{i + 1}</td>
+                      <td className="px-4 py-4 text-sm text-gray-600 hidden sm:table-cell">{sub.sortOrder || "—"}</td>
+                      <td className="px-4 py-4">
+                        <div 
+                          className="relative group cursor-pointer h-12 w-12 rounded-lg overflow-hidden bg-gray-100 border border-gray-200 shadow-sm hover:ring-2 hover:ring-indigo-500 transition-all duration-200"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (sub.imageUrl) {
+                              setZoomedImage({ url: sub.imageUrl, name: sub.name });
+                            }
+                          }}
+                        >
                           {sub.imageUrl ? (
-                            <img
-                              src={sub.imageUrl}
-                              alt={sub.name}
-                              className="h-full w-full object-cover"
-                              onError={(e) => (e.target.src = "https://via.placeholder.com/44?text=?")}
-                            />
+                            <>
+                              <img
+                                src={sub.imageUrl}
+                                alt={sub.name}
+                                className="h-full w-full object-cover"
+                                onError={(e) => (e.target.src = "https://via.placeholder.com/48?text=?")}
+                              />
+                              <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/30 rounded-lg transition-all duration-200 opacity-0 group-hover:opacity-100">
+                                <ZoomIn className="h-4 w-4 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                              </div>
+                            </>
                           ) : (
-                            <div className="h-full w-full flex items-center justify-center text-gray-400 text-[8px] sm:text-[10px]">
-                              No image
+                            <div className="h-full w-full flex items-center justify-center text-gray-400 text-xs">
+                              No img
                             </div>
                           )}
                         </div>
                       </td>
-                      <td className="px-3 sm:px-5 py-3 sm:py-4">
+                      <td className="px-4 py-4">
                         <div
                           onClick={() => navigate(`/admin/inventory/items/${categoryId}/${sub._id}`)}
-                          className="font-medium text-xs sm:text-sm text-black cursor-pointer group-hover:text-gray-700 transition-colors underline-offset-2 hover:underline"
+                          className="text-sm font-semibold text-gray-900 cursor-pointer group-hover:text-gray-700 transition-colors underline-offset-2 hover:underline"
                         >
                           {sub.name}
                         </div>
@@ -212,39 +237,50 @@ export default function Subcategories() {
                           {sub.description || "—"}
                         </div>
                       </td>
-                      <td className="px-5 py-4 text-sm text-black hidden lg:table-cell max-w-md line-clamp-2">
-                        {sub.description || <span className="text-gray-500">—</span>}
+                      <td className="px-5 py-4 text-sm text-gray-600 hidden lg:table-cell max-w-md">
+                        <div className="line-clamp-2">{sub.description || "—"}</div>
                       </td>
-                      <td className="px-3 sm:px-5 py-3 sm:py-4 text-center">
+                      <td className="px-4 py-4 text-center">
                         <button
-                          onClick={() => toggleActive(sub._id)}
-                          className={`px-2 sm:px-3 py-1 text-[10px] sm:text-xs font-semibold rounded-full transition-colors ${
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleActive(sub._id);
+                          }}
+                          className={`inline-flex items-center px-3 py-1.5 text-xs font-semibold rounded-full transition-colors ${
                             sub.isActive
-                              ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
-                              : "bg-rose-100 text-rose-800 hover:bg-rose-200"
+                              ? "bg-green-100 text-green-800 hover:bg-green-200"
+                              : "bg-red-100 text-red-800 hover:bg-red-200"
                           }`}
                         >
                           {sub.isActive ? "Active" : "Inactive"}
                         </button>
                       </td>
-                      <td className="px-3 sm:px-5 py-3 sm:py-4 text-center hidden md:table-cell">
+                      <td className="px-4 py-4 text-center hidden md:table-cell">
                         <button
-                          onClick={() => toggleNavbar(sub._id)}
-                          className={`px-2 sm:px-3 py-1 text-[10px] sm:text-xs font-semibold rounded-full transition-colors ${
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            toggleNavbar(sub._id);
+                          }}
+                          className={`inline-flex items-center px-3 py-1.5 text-xs font-semibold rounded-full transition-colors ${
                             (sub.isNavbar ?? sub.showInNavbar ?? false)
                               ? "bg-blue-100 text-blue-800 hover:bg-blue-200"
-                              : "bg-gray-200 text-gray-700 hover:bg-gray-300"
+                              : "bg-gray-100 text-gray-700 hover:bg-gray-200"
                           }`}
                         >
                           {(sub.isNavbar ?? sub.showInNavbar ?? false) ? "Shown" : "Hidden"}
                         </button>
                       </td>
-                      <td className="px-3 sm:px-5 py-3 sm:py-4 text-right text-xs sm:text-sm">
+                      <td className="px-4 py-4 text-right">
                         <button
-                          onClick={() => openEdit(sub)}
-                          className="text-black hover:text-gray-700 font-semibold transition underline-offset-2 hover:underline"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openEdit(sub);
+                          }}
+                          className="inline-flex items-center gap-1.5 text-gray-700 hover:text-black font-medium transition px-2 py-1.5 rounded-md hover:bg-gray-100"
+                          title="Edit subcategory"
                         >
-                          Edit
+                          <Edit size={18} />
+                          <span className="hidden sm:inline text-sm">Edit</span>
                         </button>
                       </td>
                     </tr>
@@ -259,12 +295,12 @@ export default function Subcategories() {
         {(pagination || subcategories.length > 0) && (
           <div className="mt-8 flex flex-col sm:flex-row justify-between items-center gap-4 px-1">
             {/* Showing info */}
-            <div className="text-sm text-black font-medium">
+            <div className="text-sm text-gray-700 font-medium">
               {loading ? (
                 "Loading..."
               ) : (
                 <>
-                  Showing <span className="font-bold">{filtered.length}</span> of{" "}
+                  Showing <span className="font-bold">{subcategories.length}</span> of{" "}
                   <span className="font-bold">{pagination?.total || subcategories.length}</span>{" "}
                   subcategories
                 </>
@@ -272,33 +308,66 @@ export default function Subcategories() {
             </div>
 
             {/* Pagination controls */}
-            {pagination && pagination.pages > 1 && (
-              <div className="flex items-center gap-2 sm:gap-3">
-                <button
-                  disabled={pagination.page <= 1 || loading}
-                  onClick={() => fetchSubcategories(pagination.page - 1)}
-                  className="px-4 py-2 bg-white border-2 border-black rounded-lg shadow-sm disabled:opacity-50 hover:bg-black hover:text-white transition text-sm font-semibold disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:text-black"
-                >
-                  ← Previous
-                </button>
+           {/* Pagination controls */}
+{pagination && (
+  <div className="flex items-center gap-3">
+    <button
+      disabled={currentPage <= 1 || loading}
+      onClick={() => setCurrentPage((prev) => prev - 1)}
+      className="px-5 py-2.5 bg-white border-2 border-gray-300 rounded-lg font-semibold text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 hover:border-gray-400 transition-all shadow-sm"
+    >
+      Previous
+    </button>
 
-                <span className="px-3 py-2 text-black font-bold text-sm min-w-[100px] text-center bg-gray-100 rounded-lg">
-                  Page {pagination.page} of {pagination.pages}
-                </span>
+    <span className="px-5 py-2.5 bg-gray-50 border border-gray-200 rounded-lg font-semibold text-gray-700 min-w-[140px] text-center">
+      Page {currentPage} of {pagination.totalPages}
+    </span>
 
-                <button
-                  disabled={pagination.page >= pagination.pages || loading}
-                  onClick={() => fetchSubcategories(pagination.page + 1)}
-                  className="px-4 py-2 bg-white border-2 border-black rounded-lg shadow-sm disabled:opacity-50 hover:bg-black hover:text-white transition text-sm font-semibold disabled:cursor-not-allowed disabled:hover:bg-white disabled:hover:text-black"
-                >
-                  Next →
-                </button>
-              </div>
-            )}
+    <button
+      disabled={currentPage >= pagination.totalPages || loading}
+      onClick={() => setCurrentPage((prev) => prev + 1)}
+      className="px-5 py-2.5 bg-white border-2 border-gray-300 rounded-lg font-semibold text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 hover:border-gray-400 transition-all shadow-sm"
+    >
+      Next
+    </button>
+  </div>
+)}
           </div>
         )}
       </main>
 
+      {/* Image Zoom Modal */}
+      {zoomedImage && (
+        <div
+          className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4"
+          onClick={() => setZoomedImage(null)}
+        >
+          {/* Close Button */}
+          <button
+            onClick={() => setZoomedImage(null)}
+            className="absolute top-4 right-4 z-10 p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition-all duration-200 backdrop-blur-sm"
+            aria-label="Close zoom"
+          >
+            <X size={28} />
+          </button>
+
+          {/* Zoomed Image Container */}
+          <div className="relative w-full h-full flex items-center justify-center">
+            <img
+              src={zoomedImage.url}
+              alt={zoomedImage.name}
+              className="max-w-[95vw] max-h-[90vh] w-auto h-auto object-contain rounded-lg shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+              style={{ maxWidth: '95vw', maxHeight: '90vh' }}
+            />
+          </div>
+
+          {/* Image Name */}
+          <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 bg-black/80 text-white px-6 py-3 rounded-lg backdrop-blur-sm">
+            <p className="text-base font-medium">{zoomedImage.name}</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

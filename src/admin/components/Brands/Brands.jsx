@@ -9,14 +9,21 @@ const Brand = () => {
   const navigate = useNavigate();
   const [brands, setBrands] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [limit] = useState(10);
 
   // ================= FETCH BRANDS =================
   const fetchBrands = async () => {
     try {
       setLoading(true);
-      const res = await getBrands();
-      const brandList = res?.data?.data?.brands || res?.data?.brands || [];
-      setBrands(brandList);
+      const res = await getBrands(currentPage, limit);
+      const data = res?.data?.data || res?.data || {};
+      const brandList = data.brands || data.items || data || [];
+      const totalCount = data.total || brandList.length || 0;
+      
+      setBrands(Array.isArray(brandList) ? brandList : []);
+      setTotalPages(data.totalPages || data.pages || Math.ceil(totalCount / limit) || 1);
     } catch (err) {
       console.error("❌ Fetch brands error:", err);
     } finally {
@@ -26,7 +33,7 @@ const Brand = () => {
 
   useEffect(() => {
     fetchBrands();
-  }, []);
+  }, [currentPage]);
 
 
   // ================= DELETE BRAND =================
@@ -35,7 +42,12 @@ const Brand = () => {
 
     try {
       await deleteBrand(id);
-      fetchBrands();
+      // If deleting last item on page, go to previous page
+      if (brands.length === 1 && currentPage > 1) {
+        setCurrentPage(currentPage - 1);
+      } else {
+        fetchBrands();
+      }
     } catch (err) {
       console.error("❌ Delete error:", err);
       alert("Failed to delete brand");
@@ -103,7 +115,7 @@ const Brand = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 bg-white">
-                  {brands.map((brand) => (
+                  {brands.map((brand, idx) => (
                     <tr
                       key={brand._id}
                       className="hover:bg-gray-50 transition-colors"
@@ -146,6 +158,37 @@ const Brand = () => {
           )}
         </div>
 
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="mt-8 flex flex-col sm:flex-row justify-between items-center gap-4 px-1">
+            <div className="text-sm text-gray-700 font-medium">
+              Showing <span className="font-bold">{brands.length}</span> of{" "}
+              <span className="font-bold">{totalPages * limit}</span> brands
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage(currentPage - 1)}
+                className="px-5 py-2.5 bg-white border-2 border-gray-300 rounded-lg font-semibold text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 hover:border-gray-400 transition-all shadow-sm"
+              >
+                Previous
+              </button>
+
+              <span className="px-5 py-2.5 bg-gray-50 border border-gray-200 rounded-lg font-semibold text-gray-700 min-w-[140px] text-center">
+                Page {currentPage} of {totalPages}
+              </span>
+
+              <button
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage(currentPage + 1)}
+                className="px-5 py-2.5 bg-white border-2 border-gray-300 rounded-lg font-semibold text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 hover:border-gray-400 transition-all shadow-sm"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

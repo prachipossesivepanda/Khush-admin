@@ -5,7 +5,7 @@ import { ArrowLeft, Plus, X } from "lucide-react";
 import {
   createFilter,
   updateFilter,
-  getFilters,
+  getFilterById,
 } from "../../apis/Filterapi";
 
 const FilterForm = () => {
@@ -25,37 +25,38 @@ const FilterForm = () => {
   });
 
   // Load filter data if editing
-  useEffect(() => {
-    if (isEdit) {
-      const loadFilter = async () => {
-        try {
-          setLoading(true);
-          const response = await getFilters({});
-          const filters = response?.data?.filters || [];
-          const filter = filters.find((f) => f._id === id);
+ useEffect(() => {
+  if (!isEdit) return;
 
-          if (filter) {
-            setFormData({
-              key: filter.key || "",
-              label: filter.label || "",
-              description: filter.description || "",
-              values:
-                filter.values?.length > 0
-                  ? filter.values
-                  : [{ label: "", value: "" }],
-              isActive: filter.isActive !== false,
-              sortOrder: filter.sortOrder || 1,
-            });
-          }
-        } catch (err) {
-          console.error("Error loading filter:", err);
-        } finally {
-          setLoading(false);
-        }
-      };
-      loadFilter();
+  const loadFilter = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+
+      const response = await getFilterById(id);
+      const filter = response?.data?.data || response?.data;
+
+      setFormData({
+        key: filter.key || "",
+        label: filter.label || "",
+        description: filter.description || "",
+        values:
+          filter.values?.length > 0
+            ? filter.values
+            : [{ label: "", value: "" }],
+        isActive: filter.isActive !== false,
+        sortOrder: filter.sortOrder || 1,
+      });
+    } catch (err) {
+      console.error("Error loading filter:", err);
+      setError("Failed to load filter data");
+    } finally {
+      setLoading(false);
     }
-  }, [id, isEdit]);
+  };
+
+  loadFilter();
+}, [id, isEdit]);
 
   const handleInputChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -129,25 +130,25 @@ const FilterForm = () => {
   };
 
   return (
-    <div className="w-full min-h-screen bg-gray-50/70">
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-        {/* Professional Back Button */}
-        <button
-          onClick={() => navigate("/admin/filters")}
-          className="mb-6 flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors group"
-        >
-          <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
-          <span>Back to Filters</span>
-        </button>
-
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
-            {isEdit ? "Edit Filter" : "Create New Filter"}
-          </h1>
-          <p className="mt-2 text-sm text-gray-500">
-            {isEdit ? "Update filter information" : "Add a new filter option"}
-          </p>
+    <div className="w-full min-h-screen bg-gray-50">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        {/* Header with Back Button and Title on Right */}
+        <div className="flex items-center justify-between mb-8">
+          <button
+            onClick={() => navigate("/admin/filters")}
+            className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors group"
+          >
+            <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
+            <span>Back</span>
+          </button>
+          <div className="text-right">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
+              {isEdit ? "Edit Filter" : "Create Filter"}
+            </h1>
+            <p className="mt-1 text-sm text-gray-500">
+              {isEdit ? "Update filter information" : "Add a new filter option"}
+            </p>
+          </div>
         </div>
 
         {/* Form Card */}

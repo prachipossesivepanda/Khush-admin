@@ -29,8 +29,13 @@ export const getInfluencers = (
     page,
     limit,
     search,
-    isActive,
   });
+
+  // Only include isActive if it's a valid boolean (not undefined/null/empty string)
+  // If null/undefined/empty, omit the parameter to get all influencers
+  if (isActive !== undefined && isActive !== null && isActive !== "") {
+    queryParams.append("isActive", isActive);
+  }
 
   return apiConnector(
     "GET",

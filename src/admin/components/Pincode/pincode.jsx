@@ -8,28 +8,54 @@ const PincodePage = () => {
   const [pincodes, setPincodes] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const limit = 10; // Fixed limit: 10 pincodes per page
+  const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
+
+  // Debounce search term to avoid too many API calls
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 500); // Wait 500ms after user stops typing
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Reset to page 1 when search term changes
+  useEffect(() => {
+    if (debouncedSearchTerm !== searchTerm) {
+      setCurrentPage(1);
+    }
+  }, [debouncedSearchTerm]);
 
   useEffect(() => {
     fetchPincodes();
-  }, []);
+  }, [currentPage, debouncedSearchTerm]);
 
-  const fetchPincodes = async () => {
-    try {
-      setLoading(true);
-      const res = await getPincodes();
+const fetchPincodes = async () => {
+  try {
+    setLoading(true);
 
-      console.log("FULL RESPONSE 👉", res);
-      console.log("DATA 👉", res.data);
-      console.log("PINCODE LIST 👉", res.data.data);
+    const res = await getPincodes(currentPage, limit, debouncedSearchTerm);
 
-      setPincodes(res.data || []); // ✅ FINAL FIX
-    } catch (err) {
-      console.error("Fetch error:", err);
-      setError("Failed to load pincodes");
-    } finally {
-      setLoading(false);
-    }
-  };
+    console.log("FINAL RESPONSE:", res);
+
+    const pincodeArray = res?.data?.data || [];
+    const pagination = res?.data?.pagination || {};
+
+    setPincodes(pincodeArray);
+    setTotalPages(pagination.totalPages || 1);
+
+    setError(null);
+  } catch (err) {
+    console.error("Fetch error:", err);
+    setError("Failed to load pincodes");
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleDelete = async (pincode) => {
     if (!window.confirm("Are you sure you want to delete this pincode?")) return;
@@ -47,18 +73,31 @@ const PincodePage = () => {
     <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-100">
       {/* Header */}
       <header className="sticky top-0 z-20 bg-white/80 backdrop-blur-md border-b border-gray-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight">
-            Serviceable Pincodes
-          </h1>
-
-          <button
-            onClick={() => navigate("/admin/pincode/create")}
-            className="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-gray-900 to-black text-white font-medium rounded-xl hover:from-gray-800 hover:to-gray-900 transition-all duration-300 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 active:scale-95"
-          >
-            <Plus size={18} strokeWidth={2.5} />
-            Add Pincode
-          </button>
+        <div className="max-w-7xl mx-auto px-6 py-4">
+          <div className="flex flex-col gap-4">
+            <h1 className="text-2xl md:text-3xl font-bold text-gray-900 tracking-tight">
+              Serviceable Pincodes
+            </h1>
+            {/* Search Bar and Create Button - Side by Side */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+              <div className="flex-1">
+                <input
+                  type="text"
+                  placeholder="Search pincodes..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2.5 text-sm text-gray-700 placeholder-gray-400 shadow-sm focus:border-black focus:ring-2 focus:ring-black/20 transition-all"
+                />
+              </div>
+              <button
+                onClick={() => navigate("/admin/pincode/create")}
+                className="flex items-center justify-center gap-2 px-5 py-2.5 bg-gradient-to-r from-gray-900 to-black text-white font-medium rounded-lg hover:from-gray-800 hover:to-gray-900 transition-all duration-300 shadow-md hover:shadow-lg transform hover:-translate-y-0.5 active:scale-95 whitespace-nowrap"
+              >
+                <Plus size={18} strokeWidth={2.5} />
+                Add Pincode
+              </button>
+            </div>
+          </div>
         </div>
       </header>
 
@@ -89,21 +128,27 @@ const PincodePage = () => {
               <table className="w-full min-w-[500px]">
                 <thead>
                   <tr className="bg-gray-50/80 border-b border-gray-200">
-                    <th className="px-8 py-4 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">
+                      #
+                    </th>
+                    <th className="px-6 py-4 text-left text-sm font-semibold text-gray-600 uppercase tracking-wider">
                       Pincode
                     </th>
-                    <th className="px-8 py-4 text-right text-sm font-semibold text-gray-600 uppercase tracking-wider">
+                    <th className="px-6 py-4 text-right text-sm font-semibold text-gray-600 uppercase tracking-wider">
                       Actions
                     </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {pincodes.map((item) => (
+                  {pincodes.map((item, idx) => (
                     <tr
                       key={item._id}
                       className="hover:bg-gray-50/60 transition-colors duration-150"
                     >
-                      <td className="px-8 py-4 font-medium text-gray-900">
+                      <td className="px-6 py-4 text-sm text-gray-500">
+                        {(currentPage - 1) * limit + idx + 1}
+                      </td>
+                      <td className="px-6 py-4 font-medium text-gray-900">
                         {item.pinCode}
                       </td>
                       <td className="px-8 py-4 text-right">
@@ -132,6 +177,29 @@ const PincodePage = () => {
                 </tbody>
               </table>
             </div>
+          </div>
+        )}
+
+        {/* Pagination */}
+        {pincodes.length > 0 && (
+          <div className="mt-4 sm:mt-6 flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-3">
+            <button
+              onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+              className="w-full sm:w-auto px-4 py-2 text-sm font-semibold text-gray-700 bg-white border-2 border-gray-300 rounded-xl hover:bg-gray-50 hover:border-gray-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-sm"
+            >
+              Previous
+            </button>
+            <div className="px-4 py-2 text-sm font-semibold text-gray-700 bg-gray-50 rounded-xl whitespace-nowrap">
+              Page {currentPage} of {totalPages}
+            </div>
+            <button
+              onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+              disabled={currentPage === totalPages}
+              className="w-full sm:w-auto px-4 py-2 text-sm font-semibold text-gray-700 bg-white border-2 border-gray-300 rounded-xl hover:bg-gray-50 hover:border-gray-400 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-sm"
+            >
+              Next
+            </button>
           </div>
         )}
       </main>

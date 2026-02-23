@@ -1,5 +1,5 @@
 // ItemForm.jsx - Complete form component for Create/Edit Item
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   createItem,
@@ -14,6 +14,7 @@ const ItemForm = () => {
 
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState(1);
+  const fileInputRefs = useRef({}); // Track file inputs to prevent double-firing
   const [form, setForm] = useState({
     name: "",
     shortDescription: "",
@@ -79,128 +80,175 @@ const ItemForm = () => {
       text: "",
       iconFile: null,
     },
+
+    exchangePolicy: {
+      iconUrl: "",
+      iconKey: "",
+      text: "",
+      iconFile: null,
+    },
+
+    cancellationPolicy: {
+      iconUrl: "",
+      iconKey: "",
+      text: "",
+      iconFile: null,
+    },
   });
 
   // Load item data if editing
   useEffect(() => {
-    if (isEdit && id) {
-      const loadItem = async () => {
-        try {
-          setLoading(true);
-          const res = await getSingleItem(id);
-          const itemData = res?.data?.data || res?.data?.item || res?.data || {};
+  if (isEdit && id) {
+    console.log("[useEffect] isEdit=true, id:", id);
+    
+    const loadItem = async () => {
+      try {
+        console.log("[loadItem] Start loading item");
+        setLoading(true);
 
-          if (itemData) {
-            setForm({
-              name: itemData.name || "",
-              shortDescription: itemData.shortDescription || "",
-              longDescription: itemData.longDescription || "",
-              price: itemData.price || "",
-              discountedPrice: itemData.discountedPrice || "",
-              productId: itemData.productId || "",
-              defaultColor: itemData.defaultColor || "Black",
-              isActive: itemData.isActive ?? true,
+        console.log("[loadItem] Calling getSingleItem API with id:", id);
+        const res = await getSingleItem(id);
 
-              variants: itemData.variants?.map((variant) => ({
+        console.log("[loadItem] API response received:", res);
+
+        // Handle response structure
+        const itemData = res?.data?.data || res?.data?.item || res?.data || {};
+        console.log("[loadItem] Parsed itemData:", itemData);
+
+        if (itemData) {
+          console.log("[loadItem] Setting form state with item data");
+          setForm({
+            name: itemData.name || "",
+            shortDescription: itemData.shortDescription || "",
+            longDescription: itemData.longDescription || "",
+            price: itemData.price || "",
+            discountedPrice: itemData.discountedPrice || "",
+            productId: itemData.productId || "",
+            defaultColor: itemData.defaultColor || "Black",
+            isActive: itemData.isActive ?? true,
+
+            variants: itemData.variants?.map((variant, vIdx) => {
+              console.log(`[loadItem] Processing variant #${vIdx + 1}:`, variant.color?.name);
+
+              const sizeMap = {};
+              const defaultSizes = ["S", "M", "L", "XL"];
+              if (variant.sizes) {
+                variant.sizes.forEach((size) => {
+                  sizeMap[size.size] = {
+                    sku: size.sku || "",
+                    size: size.size || "",
+                    stock: size.stock || "",
+                  };
+                });
+              }
+
+              return {
                 color: {
                   name: variant.color?.name || "",
                   hex: variant.color?.hex || "#000000",
                 },
                 images: variant.images?.map((img) => img.url || img) || [],
-                sizes: (() => {
-                  const sizeMap = {};
-                  const defaultSizes = ["S", "M", "L", "XL"];
-                  
-                  if (variant.sizes) {
-                    variant.sizes.forEach((size) => {
-                      sizeMap[size.size] = {
-                        sku: size.sku || "",
-                        size: size.size || "",
-                        stock: size.stock || "",
-                      };
-                    });
-                  }
-                  
-                  return defaultSizes.map((size) => 
-                    sizeMap[size] || { sku: "", size, stock: "" }
-                  );
-                })(),
-              })) || [
-                {
-                  color: { name: "Black", hex: "#000000" },
-                  images: [],
-                  sizes: [
-                    { sku: "", size: "S", stock: "" },
-                    { sku: "", size: "M", stock: "" },
-                    { sku: "", size: "L", stock: "" },
-                    { sku: "", size: "XL", stock: "" },
-                  ],
-                },
-              ],
-
-              categoryId: itemData.categoryId || categoryId || "",
-              subcategoryId: itemData.subcategoryId || subcategoryId || "",
-
-              filters: itemData.filters?.map((f) => ({
-                key: f.key || "",
-                value: f.value || "",
-              })) || [],
-
-              care: {
-                description: itemData.care?.description || "",
-                instructions:
-                  itemData.care?.instructions?.map((inst) => ({
-                    iconUrl: inst.iconUrl || "",
-                    iconKey: inst.iconKey || "",
-                    text: inst.text || "",
-                    iconFile: null,
-                  })) || [],
-              },
-
-              sizeChart: {
-                unit: itemData.sizeChart?.unit || "in",
-                headers: [
-                  { key: "chest", label: "Chest" },
-                  { key: "length", label: "Length" }
+                sizes: defaultSizes.map((size) => sizeMap[size] || { sku: "", size, stock: "" }),
+              };
+            }) || [
+              {
+                color: { name: "Black", hex: "#000000" },
+                images: [],
+                sizes: [
+                  { sku: "", size: "S", stock: "" },
+                  { sku: "", size: "M", stock: "" },
+                  { sku: "", size: "L", stock: "" },
+                  { sku: "", size: "XL", stock: "" },
                 ],
-                rows: itemData.sizeChart?.rows || [],
-                measureImages: itemData.sizeChart?.measureImage?.map((img) => img.url || img) || [],
               },
+            ],
 
-              shipping: {
-                iconUrl: itemData.shipping?.iconUrl || "",
-                iconKey: itemData.shipping?.iconKey || "",
-                title: itemData.shipping?.title || "",
-                estimatedDelivery: itemData.shipping?.estimatedDelivery || "",
-                shippingCharges: itemData.shipping?.shippingCharges || "",
-                iconFile: null,
-              },
+            categoryId: itemData.categoryId || categoryId || "",
+            subcategoryId: itemData.subcategoryId || subcategoryId || "",
 
-              codPolicy: {
-                iconUrl: itemData.codPolicy?.iconUrl || "",
-                iconKey: itemData.codPolicy?.iconKey || "",
-                text: itemData.codPolicy?.text || "",
-                iconFile: null,
-              },
+            filters: itemData.filters?.map((f) => ({
+              key: f.key || "",
+              value: f.value || "",
+            })) || [],
 
-              returnPolicy: {
-                iconUrl: itemData.returnPolicy?.iconUrl || "",
-                iconKey: itemData.returnPolicy?.iconKey || "",
-                text: itemData.returnPolicy?.text || "",
-                iconFile: null,
-              },
-            });
-          }
-        } catch (err) {
-          console.error("Error loading item:", err);
-          alert("Failed to load item details: " + (err.response?.data?.message || "Unknown error"));
-        } finally {
-          setLoading(false);
+            care: {
+              description: itemData.care?.description || "",
+              instructions: itemData.care?.instructions?.map((inst, iIdx) => {
+                console.log(`[loadItem] Processing care instruction #${iIdx + 1}`, inst.text);
+                return {
+                  iconUrl: inst.iconUrl || "",
+                  iconKey: inst.iconKey || "",
+                  text: inst.text || "",
+                  iconFile: null,
+                };
+              }) || [],
+            },
+
+            sizeChart: {
+              unit: itemData.sizeChart?.unit || "in",
+              headers: [
+                { key: "chest", label: "Chest" },
+                { key: "length", label: "Length" }
+              ],
+              rows: itemData.sizeChart?.rows || [],
+              measureImages: itemData.sizeChart?.measureImage?.map((img, idx) => {
+                console.log(`[loadItem] sizeChart image #${idx + 1}:`, img.url || img);
+                return img.url || img;
+              }) || [],
+            },
+
+            shipping: {
+              iconUrl: itemData.shipping?.iconUrl || "",
+              iconKey: itemData.shipping?.iconKey || "",
+              title: itemData.shipping?.title || "",
+              estimatedDelivery: itemData.shipping?.estimatedDelivery || "",
+              shippingCharges: itemData.shipping?.shippingCharges || "",
+              iconFile: null,
+            },
+
+            codPolicy: {
+              iconUrl: itemData.codPolicy?.iconUrl || "",
+              iconKey: itemData.codPolicy?.iconKey || "",
+              text: itemData.codPolicy?.text || "",
+              iconFile: null,
+            },
+
+            returnPolicy: {
+              iconUrl: itemData.returnPolicy?.iconUrl || "",
+              iconKey: itemData.returnPolicy?.iconKey || "",
+              text: itemData.returnPolicy?.text || "",
+              iconFile: null,
+            },
+
+            exchangePolicy: {
+              iconUrl: itemData.exchangePolicy?.iconUrl || "",
+              iconKey: itemData.exchangePolicy?.iconKey || "",
+              text: itemData.exchangePolicy?.text || "",
+              iconFile: null,
+            },
+
+            cancellationPolicy: {
+              iconUrl: itemData.cancellationPolicy?.iconUrl || "",
+              iconKey: itemData.cancellationPolicy?.iconKey || "",
+              text: itemData.cancellationPolicy?.text || "",
+              iconFile: null,
+            },
+          });
+
+          console.log("[loadItem] Form state set successfully");
         }
-      };
-      loadItem();
-    }
-  }, [id, isEdit, categoryId, subcategoryId]);
+      } catch (err) {
+        console.error("[loadItem] Error loading item:", err);
+        alert("Failed to load item details: " + (err.response?.data?.message || "Unknown error"));
+      } finally {
+        console.log("[loadItem] Loading finished");
+        setLoading(false);
+      }
+    };
+
+    loadItem();
+  }
+}, [id, isEdit, categoryId, subcategoryId]);
 
   // Variant actions
   const addVariant = () => {
@@ -235,19 +283,32 @@ const ItemForm = () => {
 
     // IMPORTANT: clone FileList immediately so it doesn't get cleared
     const fileArray = Array.from(files);
-    console.log("🟢 addImageToVariant called");
-    console.log("🟢 variantIndex:", variantIndex);
-    console.log("🟢 cloned fileArray:", fileArray);
-
+    
     setForm((prev) => {
       const newVariants = [...prev.variants];
       const existingImages = newVariants[variantIndex].images || [];
 
-      console.log("🟢 existingImages before:", existingImages);
+      // Create a Set to track existing file identifiers (name + size)
+      const existingFileIds = new Set(
+        existingImages
+          .filter(img => img instanceof File)
+          .map(img => `${img.name}-${img.size}`)
+      );
 
-      newVariants[variantIndex].images = [...existingImages, ...fileArray];
+      // Filter out duplicates by checking name and size
+      const newFiles = fileArray.filter(file => {
+        const fileId = `${file.name}-${file.size}`;
+        if (existingFileIds.has(fileId)) {
+          return false; // Skip duplicate
+        }
+        existingFileIds.add(fileId); // Track this file
+        return true;
+      });
 
-      console.log("🟢 images after add:", newVariants[variantIndex].images);
+      // Only add non-duplicate files
+      if (newFiles.length > 0) {
+        newVariants[variantIndex].images = [...existingImages, ...newFiles];
+      }
 
       return { ...prev, variants: newVariants };
     });
@@ -451,28 +512,50 @@ const ItemForm = () => {
       formData.append("isActive", String(form.isActive));
 
       // Variants - prepare JSON structure
-      const variantsData = form.variants.map((variant) => {
-        const colorName = variant.color.name?.trim();
-        if (!colorName) return null;
+      const variantsData = form.variants
+        .filter((variant) => {
+          // Only include variants with valid color names
+          return variant && variant.color && variant.color.name && variant.color.name.trim();
+        })
+        .map((variant) => {
+          const colorName = variant.color.name.trim();
+          const colorHex = (variant.color && variant.color.hex) ? variant.color.hex : "#000000";
+          const variantImages = Array.isArray(variant.images) ? variant.images : [];
+          const variantSizes = Array.isArray(variant.sizes) ? variant.sizes : [];
 
-        return {
-          color: {
-            name: colorName,
-            hex: variant.color.hex,
-            isMultipleImages: variant.images.length > 1,
-            totalImages: variant.images.length,
-          },
-          images: variant.images.map((_, idx) => ({ order: idx + 1 })),
-          sizes: variant.sizes
-            .filter((s) => s.size && s.stock !== "")
-            .map((s) => ({
-              sku: s.sku,
-              size: s.size,
-              stock: Number(s.stock) || 0,
-            })),
-        };
-      }).filter(Boolean);
+          return {
+            color: {
+              name: colorName,
+              hex: colorHex,
+              isMultipleImages: variantImages.length > 1,
+              totalImages: variantImages.length,
+            },
+            images: variantImages.map((img, idx) => {
+              // For existing URLs, include the URL; for new files, just order
+              if (img instanceof File) {
+                return { order: idx + 1 };
+              } else if (typeof img === 'string' && img.length > 0) {
+                return { order: idx + 1, url: img };
+              } else if (img && typeof img === 'object' && img.url) {
+                return { order: idx + 1, url: img.url };
+              }
+              return { order: idx + 1 };
+            }),
+            sizes: variantSizes
+              .filter((s) => s && s.size && s.stock !== "" && s.stock !== null)
+              .map((s) => ({
+                sku: (s.sku && s.sku.trim()) || "",
+                size: s.size.trim(),
+                stock: Number(s.stock) || 0,
+              })),
+          };
+        });
 
+      // Ensure variantsData is valid before sending
+      if (!Array.isArray(variantsData) || variantsData.length === 0) {
+        throw new Error("At least one variant with a color name is required");
+      }
+      
       formData.append("variants", JSON.stringify(variantsData));
 
       // Variant images - multiple files per color variant (only File objects, not URLs)
@@ -480,7 +563,7 @@ const ItemForm = () => {
         const colorName = variant.color.name?.trim();
         if (!colorName) return;
 
-        variant.images.forEach((file) => {
+        variant.images.forEach((file, index) => {
           if (file instanceof File) {
             formData.append(`variants[${colorName}]`, file);
           }
@@ -558,6 +641,28 @@ const ItemForm = () => {
       formData.append("returnPolicy", JSON.stringify(returnData));
       if (form.returnPolicy.iconFile) {
         formData.append("returnPolicyIcon", form.returnPolicy.iconFile);
+      }
+
+      // Exchange Policy - JSON + icon file
+      const exchangeData = {
+        iconUrl: form.exchangePolicy.iconUrl || "",
+        iconKey: form.exchangePolicy.iconKey || "",
+        text: form.exchangePolicy.text || "",
+      };
+      formData.append("exchangePolicy", JSON.stringify(exchangeData));
+      if (form.exchangePolicy.iconFile) {
+        formData.append("exchangePolicyIcon", form.exchangePolicy.iconFile);
+      }
+
+      // Cancellation Policy - JSON + icon file
+      const cancellationData = {
+        iconUrl: form.cancellationPolicy.iconUrl || "",
+        iconKey: form.cancellationPolicy.iconKey || "",
+        text: form.cancellationPolicy.text || "",
+      };
+      formData.append("cancellationPolicy", JSON.stringify(cancellationData));
+      if (form.cancellationPolicy.iconFile) {
+        formData.append("cancellationPolicyIcon", form.cancellationPolicy.iconFile);
       }
 
       // Filters - JSON array
@@ -839,14 +944,33 @@ const ItemForm = () => {
                         <span className="text-3xl text-gray-400">+</span>
                         <span className="text-xs text-gray-500 mt-1 font-medium">Add image</span>
                         <input
+                          ref={(el) => {
+                            if (el) fileInputRefs.current[`variant-${vIdx}`] = el;
+                          }}
                           type="file"
                           accept="image/*"
                           multiple
                           hidden
                           onChange={(e) => {
-                            if (e.target.files?.length) {
-                              addImageToVariant(vIdx, e.target.files);
-                              e.target.value = '';
+                            const files = e.target.files;
+                            if (files?.length) {
+                              // Prevent double-firing by checking if we're already processing
+                              const inputKey = `variant-${vIdx}`;
+                              const input = fileInputRefs.current[inputKey];
+                              if (input?.disabled) return;
+                              
+                              // Temporarily disable to prevent double-firing
+                              if (input) input.disabled = true;
+                              
+                              addImageToVariant(vIdx, files);
+                              
+                              // Reset input and re-enable after processing
+                              setTimeout(() => {
+                                if (input) {
+                                  input.value = '';
+                                  input.disabled = false;
+                                }
+                              }, 100);
                             }
                           }}
                         />
@@ -1423,6 +1547,140 @@ const ItemForm = () => {
                       {form.returnPolicy.iconFile && (
                         <span className="text-xs text-gray-500 mt-1 block">
                           Selected: {form.returnPolicy.iconFile.name}
+                        </span>
+                      )}
+                    </label>
+                  </div>
+                </div>
+
+                {/* Exchange Policy */}
+                <div className="border-2 border-gray-200 rounded-xl p-6 bg-white">
+                  <h3 className="font-semibold text-gray-900 mb-4">Exchange Policy</h3>
+                  <div className="space-y-4">
+                    <textarea
+                      value={form.exchangePolicy.text}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          exchangePolicy: { ...form.exchangePolicy, text: e.target.value },
+                        })
+                      }
+                      placeholder="Text (e.g. Orders can be exchanged within 7 days of delivery)"
+                      rows={3}
+                      className="w-full px-4 py-2.5 text-sm rounded-xl border-2 border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all resize-none"
+                    />
+                    <div className="flex gap-3">
+                      <input
+                        type="text"
+                        value={form.exchangePolicy.iconUrl}
+                        onChange={(e) =>
+                          setForm({
+                            ...form,
+                            exchangePolicy: { ...form.exchangePolicy, iconUrl: e.target.value },
+                          })
+                        }
+                        placeholder="Icon URL"
+                        className="flex-1 px-4 py-2.5 text-sm rounded-xl border-2 border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                      />
+                      <input
+                        type="text"
+                        value={form.exchangePolicy.iconKey}
+                        onChange={(e) =>
+                          setForm({
+                            ...form,
+                            exchangePolicy: { ...form.exchangePolicy, iconKey: e.target.value },
+                          })
+                        }
+                        placeholder="Icon Key"
+                        className="flex-1 px-4 py-2.5 text-sm rounded-xl border-2 border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                      />
+                    </div>
+                    <label className="block">
+                      <span className="text-sm font-semibold text-gray-700 mb-1 block">Exchange Policy Icon File</span>
+                      <input
+                        type="file"
+                        accept="image/*,.svg"
+                        onChange={(e) =>
+                          setForm({
+                            ...form,
+                            exchangePolicy: {
+                              ...form.exchangePolicy,
+                              iconFile: e.target.files?.[0] || null,
+                            },
+                          })
+                        }
+                        className="text-sm text-gray-600"
+                      />
+                      {form.exchangePolicy.iconFile && (
+                        <span className="text-xs text-gray-500 mt-1 block">
+                          Selected: {form.exchangePolicy.iconFile.name}
+                        </span>
+                      )}
+                    </label>
+                  </div>
+                </div>
+
+                {/* Cancellation Policy */}
+                <div className="border-2 border-gray-200 rounded-xl p-6 bg-white">
+                  <h3 className="font-semibold text-gray-900 mb-4">Cancellation Policy</h3>
+                  <div className="space-y-4">
+                    <textarea
+                      value={form.cancellationPolicy.text}
+                      onChange={(e) =>
+                        setForm({
+                          ...form,
+                          cancellationPolicy: { ...form.cancellationPolicy, text: e.target.value },
+                        })
+                      }
+                      placeholder="Text (e.g. Orders can be cancelled within 24 hours of placement)"
+                      rows={3}
+                      className="w-full px-4 py-2.5 text-sm rounded-xl border-2 border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all resize-none"
+                    />
+                    <div className="flex gap-3">
+                      <input
+                        type="text"
+                        value={form.cancellationPolicy.iconUrl}
+                        onChange={(e) =>
+                          setForm({
+                            ...form,
+                            cancellationPolicy: { ...form.cancellationPolicy, iconUrl: e.target.value },
+                          })
+                        }
+                        placeholder="Icon URL"
+                        className="flex-1 px-4 py-2.5 text-sm rounded-xl border-2 border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                      />
+                      <input
+                        type="text"
+                        value={form.cancellationPolicy.iconKey}
+                        onChange={(e) =>
+                          setForm({
+                            ...form,
+                            cancellationPolicy: { ...form.cancellationPolicy, iconKey: e.target.value },
+                          })
+                        }
+                        placeholder="Icon Key"
+                        className="flex-1 px-4 py-2.5 text-sm rounded-xl border-2 border-gray-300 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                      />
+                    </div>
+                    <label className="block">
+                      <span className="text-sm font-semibold text-gray-700 mb-1 block">Cancellation Policy Icon File</span>
+                      <input
+                        type="file"
+                        accept="image/*,.svg"
+                        onChange={(e) =>
+                          setForm({
+                            ...form,
+                            cancellationPolicy: {
+                              ...form.cancellationPolicy,
+                              iconFile: e.target.files?.[0] || null,
+                            },
+                          })
+                        }
+                        className="text-sm text-gray-600"
+                      />
+                      {form.cancellationPolicy.iconFile && (
+                        <span className="text-xs text-gray-500 mt-1 block">
+                          Selected: {form.cancellationPolicy.iconFile.name}
                         </span>
                       )}
                     </label>

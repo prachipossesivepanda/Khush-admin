@@ -12,18 +12,35 @@ const DeliveryAgent = () => {
   const [agents, setAgents] = useState([]);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  // Debounce search term to avoid too many API calls
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search);
+    }, 500); // Wait 500ms after user stops typing
+
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  // Reset to page 1 when search term changes
+  useEffect(() => {
+    if (debouncedSearch !== search) {
+      setPage(1);
+    }
+  }, [debouncedSearch]);
 
   const fetchAgents = async () => {
     setLoading(true);
     setError(null);
 
-    console.log("→ Fetching delivery agents", { page, search, onlyActive: false });
+    console.log("→ Fetching delivery agents", { page, search: debouncedSearch, onlyActive: false });
 
     try {
-      const res = await getDeliveryAgents(page, 10, search, false);
+      const res = await getDeliveryAgents(page, 10, debouncedSearch, false);
 
       const data = res?.data;
       console.log("← API response:", data);
@@ -72,7 +89,7 @@ const DeliveryAgent = () => {
 
   useEffect(() => {
     fetchAgents();
-  }, [page, search]);
+  }, [page, debouncedSearch]);
 
   const handleDelete = async (id) => {
     if (!window.confirm("Are you sure you want to delete this agent?")) return;

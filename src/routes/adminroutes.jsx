@@ -1,4 +1,5 @@
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
+import ProtectedRoute from "../utils/ProtectedRoute";
 
 import Login from "../admin/components/Auth/Login";
 import OTP from "../admin/components/Auth/Otp";
@@ -38,81 +39,99 @@ import Deliveryagent from "../admin/components/Deliveryagent/Deliveryagent";
 import DeliveryAgentForm from "../admin/components/Deliveryagent/Deliveryagentform";
 import Warehouse from "../admin/components/Warehouse/Warehouse";
 import WarehouseForm from "../admin/components/Warehouse/WarehouseForm";
-
+import Showsubcategory from "../admin/components/inventory/showsubcategory";
+import ShowItems from "../admin/components/inventory/ShowItems";
+import InfluencerCoupons from "../admin/components/influencer/influencercoupon";
+import InfluencerCouponsForm from "../admin/components/influencer/influencercouponform";
+import CouponAnalytics from "../admin/components/coupon/CouponAnayltics";
+import InfluencerCouponManage from "../admin/components/influencer/influencercouponmanagement";
 const AdminRoutes = () => {
   return (
     <Routes>
-      {/* Auth Routes */}
-      <Route path="/" element={<Login />} />
-      <Route path="/admin/otp" element={<OTP />} />
+      {/* Auth Routes - relative to /admin/* */}
+      <Route index element={<Login />} />
+      <Route path="otp" element={<OTP />} />
 
-      {/* Layout Routes */}
-      <Route element={<Layout />}>
-        <Route path="/admin/dashboard" element={<Dashboard />} />
-        <Route path="/admin/inventory/categories" element={<Categories />} />
-        <Route path="/admin/inventory/categories/create" element={<CategoryForm />} />
-        <Route path="/admin/inventory/categories/edit/:id" element={<CategoryForm />} />
-        <Route path="/admin/inventory/subcategories/:categoryId" element={<Subcategories />} />
-        <Route path="/admin/inventory/subcategories/:categoryId/create" element={<SubcategoryForm />} />
-        <Route path="/admin/inventory/subcategories/:categoryId/edit/:id" element={<SubcategoryForm />} />
-        <Route path="/admin/inventory/items/:categoryId/:subcategoryId" element={<Items />} />
-        <Route path="/admin/inventory/items/:categoryId/:subcategoryId/create" element={<ItemForm />} />
-        <Route path="/admin/inventory/items/:categoryId/:subcategoryId/edit/:id" element={<ItemForm />} />
-        <Route path="/admin/inventory/items/:itemId" element={<ItemDetails />} />
+      {/* Protected Layout Routes */}
+      <Route 
+        element={
+          <ProtectedRoute allowedRoles={['ADMIN', 'SUBADMIN']}>
+            <Layout />
+          </ProtectedRoute>
+        }
+      >
+        <Route path="dashboard" element={<Dashboard />} />
+        <Route path="inventory/categories" element={<Categories />} />
+        <Route path="inventory/categories/create" element={<CategoryForm />} />
+        <Route path="inventory/categories/edit/:id" element={<CategoryForm />} />
+        <Route path="subcategoriess" element={<Showsubcategory/>}/>
+        <Route path="items" element={<ShowItems />} />
+        <Route path="inventory/subcategories/:categoryId" element={<Subcategories />} />
+        <Route path="inventory/subcategories/:categoryId/create" element={<SubcategoryForm />} />
+        <Route path="inventory/subcategories/:categoryId/edit/:id" element={<SubcategoryForm />} />
+        <Route path="inventory/items/:categoryId/:subcategoryId" element={<Items />} />
+        <Route path="inventory/items/:categoryId/:subcategoryId/create" element={<ItemForm />} />
+        <Route path="inventory/items/:categoryId/:subcategoryId/edit/:id" element={<ItemForm />} />
+        <Route path="inventory/items/:itemId" element={<ItemDetails />} />
 
-        <Route path="/admin/banners" element={<Banner />} />
-        <Route path="/admin/banners/create" element={<BannerForm />} />
-        <Route path="/admin/banners/edit/:id" element={<BannerForm />} />
+        <Route path="banners" element={<Banner />} />
+        <Route path="banners/create" element={<BannerForm />} />
+        <Route path="banners/edit/:id" element={<BannerForm />} />
 
-        <Route path="/admin/brands" element={<Brand />} />
-        <Route path="/admin/brands/create" element={<BrandForm />} />
-        <Route path="/admin/brands/edit/:id" element={<BrandForm />} />
+        <Route path="brands" element={<Brand />} />
+        <Route path="brands/create" element={<BrandForm />} />
+        <Route path="brands/edit/:id" element={<BrandForm />} />
 
-        <Route path="/admin/sections" element={<Section />} />
-        <Route path="/admin/sections/create" element={<SectionForm />} />
-        <Route path="/admin/sections/edit/:id" element={<SectionForm />} />
+        <Route path="sections" element={<Section />} />
+        <Route path="sections/create" element={<SectionForm />} />
+        <Route path="sections/edit/:id" element={<SectionForm />} />
 
-        <Route path="/admin/features" element={<Feature />} />
-        <Route path="/admin/features/create" element={<FeatureForm />} />
-        <Route path="/admin/features/edit/:id" element={<FeatureForm />} />
+        <Route path="features" element={<Feature />} />
+        <Route path="features/create" element={<FeatureForm />} />
+        <Route path="features/edit/:id" element={<FeatureForm />} />
 
-        <Route path="/admin/filters" element={<Filter />} />
-        <Route path="/admin/filters/create" element={<FilterForm />} />
-        <Route path="/admin/filters/edit/:id" element={<FilterForm />} />
+        <Route path="filters" element={<Filter />} />
+        <Route path="filters/create" element={<FilterForm />} />
+        <Route path="filters/edit/:id" element={<FilterForm />} />
 
-        <Route path="/admin/coupons" element={<CouponPage />} />
-        <Route path="/admin/coupons/create" element={<CouponForm />} />
-        <Route path="/admin/coupons/edit/:id" element={<CouponForm />} />
+        <Route path="coupons" element={<CouponPage />} />
+        <Route path="coupons/create" element={<CouponForm />} />
+        <Route path="coupons/edit/:id" element={<CouponForm />} />
+        <Route path="coupon-analytics" element={<CouponAnalytics/>}/>
 
-        <Route path="/admin/cart-charges" element={<CartChargesPage />} />
-        <Route path="/admin/cart-charges/create" element={<CartChargeForm />} />
-        <Route path="/admin/cart-charges/edit/:id" element={<CartChargeForm />} />
+        <Route path="cart-charges" element={<CartChargesPage />} />
+        <Route path="cart-charges/create" element={<CartChargeForm />} />
+        <Route path="cart-charges/edit/:id" element={<CartChargeForm />} />
 
-        <Route path="/admin/pincode" element={<PincodePage />} />
-        <Route path="/admin/pincode/create" element={<PincodeForm />} />
-        <Route path="/admin/pincode/edit/:pincode" element={<PincodeForm />} />
+        <Route path="pincode" element={<PincodePage />} />
+        <Route path="pincode/create" element={<PincodeForm />} />
+        <Route path="pincode/edit/:pincode" element={<PincodeForm />} />
 
-        <Route path="/admin/splash" element={<SplashPage />} />
-        <Route path="/admin/splash/create" element={<SplashForm />} />
-        <Route path="/admin/splash/edit" element={<SplashForm />} />
+        <Route path="splash" element={<SplashPage />} />
+        <Route path="banner-form" element={<SplashForm />} />
+        <Route path="banner-form/:id" element={<SplashForm />} />
 
-        <Route path="/admin/delivery" element={<Delivery />} />
+        <Route path="delivery" element={<Delivery />} />
 
-        <Route path="/admin/subadmin" element={<SubAdmin />} />
-        <Route path="/admin/subadmin/create" element={<SubAdminForm />} />
-        <Route path="/admin/subadmin/edit/:id" element={<SubAdminForm />} />
+        <Route path="subadmin" element={<SubAdmin />} />
+        <Route path="subadmin/create" element={<SubAdminForm />} />
+        <Route path="subadmin/edit/:id" element={<SubAdminForm />} />
 
-        <Route path="/admin/influencer" element={<Influencer />} />
-        <Route path="/admin/influencer/create" element={<InfluencerForm />} />
-        <Route path="/admin/influencer/edit/:id" element={<InfluencerForm />} />
+        <Route path="influencer" element={<Influencer />} />
+        <Route path="influencer/create" element={<InfluencerForm />} />
+        <Route path="influencer/edit/:id" element={<InfluencerForm />} />
 
-        <Route path="/admin/driver" element={<Deliveryagent />} />
-        <Route path="/admin/driver/create" element={<DeliveryAgentForm />} />
-        <Route path="/admin/driver/edit/:id" element={<DeliveryAgentForm />} />
+        <Route path="driver" element={<Deliveryagent />} />
+        <Route path="driver/create" element={<DeliveryAgentForm />} />
+        <Route path="driver/edit/:id" element={<DeliveryAgentForm />} />
 
-        <Route path="/admin/warehouse" element={<Warehouse />} />
-        <Route path="/admin/warehouse/create" element={<WarehouseForm />} />
-        <Route path="/admin/warehouse/edit/:id" element={<WarehouseForm />} />
+        <Route path="warehouse" element={<Warehouse />} />
+        <Route path="warehouse/create" element={<WarehouseForm />} />
+        <Route path="warehouse/edit/:id" element={<WarehouseForm />} />
+        <Route path="influencer/coupons" element={<InfluencerCoupons />} />
+        <Route path="influencer/coupons/create" element={<InfluencerCouponsForm />} />
+        <Route path="influencer/coupons/edit/:id" element={<InfluencerCouponsForm />} />
+        <Route  path="influencer/:id/coupons" element={<InfluencerCouponManage/>}/>
       </Route>
 
       <Route path="*" element={<h1>404 - Page Not Found</h1>} />

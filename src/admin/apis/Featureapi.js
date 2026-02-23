@@ -31,11 +31,12 @@ export const getFeatures = (page = 1, limit = 6) => {
 
 // ✅ Update Feature (id in URL)
 // Bannerapi.js
-export const updateFeaturedImage = (formData) => {
+// ✅ Update Feature (id in URL)
+export const updateFeature = (id, data) => {
   return apiConnector(
-    "PUT",
-    featuredImageEndpoints.UPDATE_FEATURED_IMAGE, // just /update
-    formData
+    "PATCH",
+    `${featureEndpoints.UPDATE_FEATURE}/${id}`,
+    data
   );
 };
 

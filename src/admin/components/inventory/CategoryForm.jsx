@@ -1,7 +1,7 @@
 // CategoryForm.jsx
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Upload, Image as ImageIcon } from "lucide-react";
+import { ArrowLeft, Upload, Image as ImageIcon, ZoomIn, X } from "lucide-react";
 import {
   createCategory,
   updateCategory,
@@ -30,6 +30,7 @@ const CategoryForm = () => {
   const [allowEditSortOrder, setAllowEditSortOrder] = useState(false);
   const [sortError, setSortError] = useState("");
   const [submitError, setSubmitError] = useState("");
+  const [zoomedImage, setZoomedImage] = useState(null);
 
   // ================= LOAD DATA =================
   useEffect(() => {
@@ -205,25 +206,25 @@ const CategoryForm = () => {
 
   // ================= UI =================
   return (
-    <div className="w-full min-h-screen bg-gray-50/70">
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-        {/* Professional Back Button */}
-        <button
-          onClick={() => navigate("/admin/inventory/categories")}
-          className="mb-6 flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors group"
-        >
-          <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
-          <span>Back to Categories</span>
-        </button>
-
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
-            {isEdit ? "Edit Category" : "Create New Category"}
-          </h1>
-          <p className="mt-2 text-sm text-gray-500">
-            {isEdit ? "Update category information" : "Add a new category to your inventory"}
-          </p>
+    <div className="w-full min-h-screen bg-gray-50">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        {/* Header with Back Button and Title on Right */}
+        <div className="flex items-center justify-between mb-8">
+          <button
+            onClick={() => navigate("/admin/inventory/categories")}
+            className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors group"
+          >
+            <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
+            <span>Back</span>
+          </button>
+          <div className="text-right">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
+              {isEdit ? "Edit Category" : "Create Category"}
+            </h1>
+            <p className="mt-1 text-sm text-gray-500">
+              {isEdit ? "Update category information" : "Add a new category"}
+            </p>
+          </div>
         </div>
 
         {/* Form Card */}
@@ -298,12 +299,21 @@ const CategoryForm = () => {
               </label>
               
               {form.imagePreview && (
-                <div className="mb-3">
-                  <img
-                    src={form.imagePreview}
-                    alt="Preview"
-                    className="h-24 w-24 object-cover rounded-lg border-2 border-gray-200 shadow-sm"
-                  />
+                <div className="mb-3 relative inline-block">
+                  <div 
+                    className="relative group cursor-pointer"
+                    onClick={() => setZoomedImage({ url: form.imagePreview, name: form.name || "Category Image" })}
+                  >
+                    <img
+                      src={form.imagePreview}
+                      alt="Preview"
+                      className="h-32 w-32 lg:h-40 lg:w-40 object-cover rounded-lg border-2 border-gray-200 shadow-sm hover:ring-2 hover:ring-indigo-500 transition-all duration-200"
+                    />
+                    <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/30 rounded-lg transition-all duration-200 opacity-0 group-hover:opacity-100">
+                      <ZoomIn className="h-6 w-6 lg:h-8 lg:w-8 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">Click image to zoom</p>
                 </div>
               )}
 
@@ -377,6 +387,39 @@ const CategoryForm = () => {
           </form>
         </div>
       </div>
+
+      {/* Image Zoom Modal */}
+      {zoomedImage && (
+        <div
+          className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4"
+          onClick={() => setZoomedImage(null)}
+        >
+          {/* Close Button */}
+          <button
+            onClick={() => setZoomedImage(null)}
+            className="absolute top-4 right-4 z-10 p-3 bg-white/10 hover:bg-white/20 rounded-full text-white transition-all duration-200 backdrop-blur-sm"
+            aria-label="Close zoom"
+          >
+            <X size={28} />
+          </button>
+
+          {/* Zoomed Image Container */}
+          <div className="relative w-full h-full flex items-center justify-center">
+            <img
+              src={zoomedImage.url}
+              alt={zoomedImage.name}
+              className="max-w-[95vw] max-h-[90vh] w-auto h-auto object-contain rounded-lg shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+              style={{ maxWidth: '95vw', maxHeight: '90vh' }}
+            />
+          </div>
+
+          {/* Image Name */}
+          <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 bg-black/80 text-white px-6 py-3 rounded-lg backdrop-blur-sm">
+            <p className="text-base font-medium">{zoomedImage.name}</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

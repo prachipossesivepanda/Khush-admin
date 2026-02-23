@@ -26,16 +26,15 @@ export const createCategory = (data) => {
 /**
  * ================================
  * GET ALL CATEGORIES (PAGINATED)
+ * Supports search parameter for backend filtering
  * ================================
  */
-export const getAllCategories = (page = 1, limit = 10) => {
-  return apiConnector(
-    "GET",
-    categoryEndpoints.GET_ALL_CATEGORIES,
-    null,
-    {},
-    { page, limit } // query params
-  );
+export const getAllCategories = (page = 1, limit = 10, search = "") => {
+  let url = `/categories/getAll?page=${page}&limit=${limit}`;
+  if (search && search.trim()) {
+    url += `&search=${encodeURIComponent(search.trim())}`;
+  }
+  return apiConnector("GET", url);
 };
 
 /**
@@ -73,5 +72,16 @@ export const toggleCategoryNavbarStatus = (categoryId) => {
   return apiConnector(
     "PATCH",
     `${categoryEndpoints.TOGGLE_NAVBAR_STATUS}/${categoryId}`
+  );
+};
+
+export const getSubCategoriesByCategoryId = (
+  categoryId,
+  page = 1,
+  limit = 10
+) => {
+  return apiConnector(
+    "GET",
+    `/subcategories/getAll/${categoryId}?page=${page}&limit=${limit}`
   );
 };

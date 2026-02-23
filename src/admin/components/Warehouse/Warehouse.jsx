@@ -16,6 +16,7 @@ export default function Warehouse() {
   const navigate = useNavigate();
 
   const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [warehouses, setWarehouses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -36,14 +37,30 @@ export default function Warehouse() {
   const [stockLoading, setStockLoading] = useState(false);
   const [stockForm, setStockForm] = useState({ sku: "", quantity: "" });
 
+  // Debounce search term to avoid too many API calls
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 500); // Wait 500ms after user stops typing
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Reset to page 1 when search term changes
+  useEffect(() => {
+    if (debouncedSearchTerm !== searchTerm) {
+      setCurrentPage(1);
+    }
+  }, [debouncedSearchTerm]);
+
   useEffect(() => {
     fetchWarehouses();
-  }, [currentPage, searchTerm]);
+  }, [currentPage, debouncedSearchTerm]);
 
   const fetchWarehouses = async () => {
     setLoading(true);
     try {
-      const response = await getWarehouses(currentPage, limit, searchTerm);
+      const response = await getWarehouses(currentPage, limit, debouncedSearchTerm);
       const data = response?.data?.data || response?.data || {};
       
       const warehouseList = data.warehouses || data.items || data || [];
@@ -503,27 +520,34 @@ export default function Warehouse() {
         </div>
 
         {/* Pagination */}
-        {totalPages > 1 && (
-          <div className="mt-6 flex items-center justify-center gap-2">
-            <button
-              onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-              disabled={currentPage === 1}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              Previous
-            </button>
-            <span className="px-4 py-2 text-sm font-medium text-gray-700">
-              Page {currentPage} of {totalPages}
-            </span>
-            <button
-              onClick={() =>
-                setCurrentPage((prev) => Math.min(totalPages, prev + 1))
-              }
-              disabled={currentPage === totalPages}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            >
-              Next
-            </button>
+        {warehouses.length > 0 && (
+          <div className="mt-6 flex flex-col sm:flex-row justify-between items-center gap-4 px-1">
+            <div className="text-sm text-gray-700 font-medium">
+              Showing <span className="font-bold">{warehouses.length}</span> of{" "}
+              <span className="font-bold">{totalPages * limit}</span> warehouses
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                disabled={currentPage === 1 || loading}
+                className="px-5 py-2.5 bg-white border-2 border-gray-300 rounded-lg font-semibold text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 hover:border-gray-400 transition-all shadow-sm"
+              >
+                Previous
+              </button>
+              <span className="px-5 py-2.5 bg-gray-50 border border-gray-200 rounded-lg font-semibold text-gray-700 min-w-[140px] text-center">
+                Page {currentPage} of {totalPages || 1}
+              </span>
+              <button
+                onClick={() =>
+                  setCurrentPage((prev) => Math.min(totalPages, prev + 1))
+                }
+                disabled={currentPage >= totalPages || loading}
+                className="px-5 py-2.5 bg-white border-2 border-gray-300 rounded-lg font-semibold text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 hover:border-gray-400 transition-all shadow-sm"
+              >
+                Next
+              </button>
+            </div>
           </div>
         )}
       </div>

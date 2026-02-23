@@ -3,22 +3,28 @@ import { apiConnector } from "../services/Apiconnector";
 export const sectionEndpoints = {
   CREATE_SECTION: "/sections/create",
   GET_SECTIONS: "/sections/get",
+  GET_SINGLE: "/sections/getSingle",
   UPDATE_SECTION: "/sections/update",
-  DELETE_SECTION: "/sections/delete",
+  TOGGLE_ACTIVE_STATUS: "/sections/activeStatus",
 };
 
-// ✅ Create Section
+// Create
 export const createSection = (data) => {
   return apiConnector("POST", sectionEndpoints.CREATE_SECTION, data);
 };
 
-// ✅ Get Sections (MANUAL / CATEGORY)
+// Get (with pagination)
 export const getSections = ({
-  type = "MANUAL",
+  type,
   page = 1,
   limit = 5,
 } = {}) => {
-  const query = `?type=${type}&page=${page}&limit=${limit}`;
+  const queryParams = [`page=${page}`, `limit=${limit}`];
+  if (type && type !== "ALL") {
+    queryParams.push(`type=${type}`);
+  }
+
+  const query = `?${queryParams.join("&")}`;
 
   return apiConnector(
     "GET",
@@ -26,24 +32,40 @@ export const getSections = ({
   );
 };
 
-// ✅ Update Section
-export const updateSection = (id, data) => {
+// Alias
+export const getAllSections = (params = {}) => {
+  return getSections(params);
+};
+
+// Get single
+export const getSingleSection = (id) => {
+  if (!id) {
+    throw new Error("Section ID is required");
+  }
+
   return apiConnector(
-    "PATCH",
-    sectionEndpoints.UPDATE_SECTION,
-    data,
-    {},
-    { sectionId: id }
+    "GET",
+    `${sectionEndpoints.GET_SINGLE}/${id}`
   );
 };
 
-// ✅ Delete Section
-export const deleteSection = (id) => {
+// Update
+export const updateSection = (id, data) => {
   return apiConnector(
-    "DELETE",
-    sectionEndpoints.DELETE_SECTION,
-    null,
-    {},
-    { sectionId: id }
+    "PATCH",
+    `${sectionEndpoints.UPDATE_SECTION}/${id}`,
+    data
+  );
+};
+
+// Toggle Active Status
+export const toggleSectionActiveStatus = (id) => {
+  if (!id) {
+    throw new Error("Section ID is required");
+  }
+
+  return apiConnector(
+    "PATCH",
+    `${sectionEndpoints.TOGGLE_ACTIVE_STATUS}/${id}`
   );
 };

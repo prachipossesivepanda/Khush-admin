@@ -1,6 +1,7 @@
 // Sidebar.jsx
-import { useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { useState } from "react";
+import Khush from "../../../assets/images/khushh.svg";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
   Package,
@@ -17,13 +18,15 @@ import {
   UserPlus,
   Truck,
   Building2,
-} from 'lucide-react';
+} from "lucide-react";
 import { GrDeliver } from "react-icons/gr";
-import { logoutUser } from '../../apis/Authapi';
+import { logoutUser } from "../../apis/Authapi";
 
 const Sidebar = () => {
   const [isInventoryOpen, setIsInventoryOpen] = useState(true);
   const [isOpen, setIsOpen] = useState(false);
+  const [isCouponOpen, setIsCouponOpen] = useState(false);
+  const [isInfluencerOpen, setIsInfluencerOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
@@ -32,7 +35,7 @@ const Sidebar = () => {
 
   const handleLogout = async () => {
     console.log("🚪 Logout button clicked");
-    
+
     if (isLoggingOut) {
       console.log("⚠️ Logout already in progress");
       return;
@@ -41,21 +44,21 @@ const Sidebar = () => {
     try {
       setIsLoggingOut(true);
       console.log("📡 Calling logout API...");
-      
+
       const response = await logoutUser();
       console.log("✅ Logout API response:", response);
-      
+
       // Clear local storage
       console.log("🧹 Clearing local storage...");
-      localStorage.removeItem('token');
-      localStorage.removeItem('admin_userId');
-      localStorage.removeItem('admin_phone');
-      
+      localStorage.removeItem("token");
+      localStorage.removeItem("admin_userId");
+      localStorage.removeItem("admin_phone");
+
       console.log("🎉 Logout successful! Redirecting to login...");
-      
+
       // Redirect to login page
-      navigate('/');
-      window.location.href = '/'; // Force reload to clear any cached state
+      navigate("/admin");
+      window.location.href = "/"; // Force reload to clear any cached state
     } catch (error) {
       console.error("❌ Logout error:", error);
       console.error("❌ Error details:", {
@@ -63,15 +66,15 @@ const Sidebar = () => {
         status: error?.response?.status,
         data: error?.response?.data,
       });
-      
+
       // Even if API fails, clear local storage and redirect
       console.log("⚠️ API call failed, but clearing local storage anyway...");
-      localStorage.removeItem('token');
-      localStorage.removeItem('admin_userId');
-      localStorage.removeItem('admin_phone');
-      
-      navigate('/');
-      window.location.href = '/';
+      localStorage.removeItem("token");
+      localStorage.removeItem("admin_userId");
+      localStorage.removeItem("admin_phone");
+
+      navigate("/admin");
+      window.location.href = "/";
     } finally {
       setIsLoggingOut(false);
       console.log("🏁 Logout process finished");
@@ -93,17 +96,21 @@ const Sidebar = () => {
           fixed inset-y-0 left-0 z-40 w-72 bg-black text-gray-100 flex flex-col
           transform transition-transform duration-300 ease-in-out
           lg:translate-x-0
-          ${isOpen ? 'translate-x-0' : '-translate-x-full'}
+          ${isOpen ? "translate-x-0" : "-translate-x-full"}
           lg:shadow-2xl
         `}
       >
         {/* Logo */}
         <div className="h-16 flex items-center px-6 border-b border-gray-800 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-white flex items-center justify-center shadow-md">
-              <span className="text-black font-black text-2xl">K</span>
+            <div className="w-19 h-15 rounded-xl flex items-center justify-center shadow-md">
+              <img
+                src={Khush} // 🔥 change this to your image path
+                alt="Khush Logo"
+                className="w-full h-full object-contain"
+              />{" "}
             </div>
-            <span className="text-xl font-bold tracking-tight">Khush</span>
+            {/* <span className="text-xl font-bold tracking-tight">Khush</span> */}
           </div>
         </div>
 
@@ -114,10 +121,13 @@ const Sidebar = () => {
             <Link
               to="/admin/dashboard"
               className={`flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-white hover:text-black transition-all duration-200 font-medium group ${
-                isActive('/admin/dashboard') ? 'bg-white/10 text-white' : ''
+                isActive("/admin/dashboard") ? "bg-white/10 text-white" : ""
               }`}
             >
-              <LayoutDashboard size={20} className="text-gray-400 group-hover:text-black" />
+              <LayoutDashboard
+                size={20}
+                className="text-gray-400 group-hover:text-black"
+              />
               <span>Dashboard</span>
             </Link>
 
@@ -126,11 +136,14 @@ const Sidebar = () => {
               <button
                 onClick={() => setIsInventoryOpen(!isInventoryOpen)}
                 className={`w-full flex items-center justify-between px-4 py-3 text-gray-300 hover:bg-white hover:text-black transition-all duration-200 font-medium group ${
-                  isInventoryOpen ? 'bg-white/5 text-white' : ''
+                  isInventoryOpen ? "bg-white/5 text-white" : ""
                 }`}
               >
                 <div className="flex items-center gap-3">
-                  <Package size={20} className="text-gray-400 group-hover:text-black" />
+                  <Package
+                    size={20}
+                    className="text-gray-400 group-hover:text-black"
+                  />
                   <span>Inventory</span>
                 </div>
                 {isInventoryOpen ? (
@@ -143,140 +156,252 @@ const Sidebar = () => {
               {/* Dropdown */}
               <div
                 className={`overflow-hidden transition-all duration-300 ease-in-out ${
-                  isInventoryOpen ? 'max-h-96 opacity-100 mt-1' : 'max-h-0 opacity-0'
+                  isInventoryOpen
+                    ? "max-h-96 opacity-100 mt-1"
+                    : "max-h-0 opacity-0"
                 }`}
               >
                 <div className="pl-10 pr-4 py-2 space-y-1">
                   <Link
                     to="/admin/inventory/categories"
                     className={`block px-4 py-2.5 text-gray-400 hover:bg-white hover:text-black transition-all duration-200 text-sm font-medium ${
-                      location.pathname.includes('/admin/inventory/categories') ? 'bg-white/10 text-white' : ''
+                      location.pathname.includes("/admin/inventory/categories")
+                        ? "bg-white/10 text-white"
+                        : ""
                     }`}
                   >
                     Categories
                   </Link>
+
+                  <Link
+                    to="/admin/subcategoriess"
+                    className={`block px-4 py-2.5 text-gray-400 hover:bg-white hover:text-black transition-all duration-200 text-sm font-medium ${
+                      location.pathname.includes("/admin/subcategoriess")
+                        ? "bg-white/10 text-white"
+                        : ""
+                    }`}
+                  >
+                    SubCategories
+                  </Link>
+                  <Link
+                    to="/admin/items"
+                    className={`block px-4 py-2.5 text-gray-400 hover:bg-white hover:text-black transition-all duration-200 text-sm font-medium ${
+                      location.pathname.includes("/admin/items")
+                        ? "bg-white/10 text-white"
+                        : ""
+                    }`}
+                  >
+                    Items
+                  </Link>
+                  {/* <Link
+                    to="/admin/inventory/subcategoriesss"
+                    className={`block px-4 py-2.5 text-gray-400 hover:bg-white hover:text-black transition-all duration-200 text-sm font-medium ${
+                      location.pathname.includes('/admin/inventory/categories') ? 'bg-white/10 text-white' : ''
+                    }`}
+                  >
+                    SubCategories
+                  </Link> */}
+                <Link
+                    to="/admin/items"
+                    className={`block px-4 py-2.5 text-gray-400 hover:bg-white hover:text-black transition-all duration-200 text-sm font-medium ${
+                      location.pathname.includes("/admin/items")
+                        ? "bg-white/10 text-white"
+                        : ""
+                    }`}
+                  >
+                    Stock management
+                  </Link>
+
                 </div>
               </div>
             </div>
 
             {/* Other items */}
-            <Link
-              to="/admin/coupons"
-              className={`flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-white hover:text-black transition-all duration-200 font-medium group ${
-                isActive('/admin/coupons') ? 'bg-white/10 text-white' : ''
-              }`}
-            >
-              <Tags size={20} className="text-gray-400 group-hover:text-black" />
-              <span>Coupons</span>
-            </Link>
+            {/* Coupons Dropdown */}
+            <div>
+              <button
+                onClick={() => setIsCouponOpen(!isCouponOpen)}
+                className="w-full flex items-center justify-between px-4 py-3 text-gray-300 hover:bg-white hover:text-black transition-all duration-200 font-medium group"
+              >
+                <div className="flex items-center gap-3">
+                  <Tags
+                    size={20}
+                    className="text-gray-400 group-hover:text-black"
+                  />
+                  <span>Coupons</span>
+                </div>
+                {isCouponOpen ? (
+                  <ChevronDown size={18} className="text-gray-400" />
+                ) : (
+                  <ChevronRight size={18} className="text-gray-400" />
+                )}
+              </button>
+
+              <div
+                className={`overflow-hidden transition-all duration-300 ${
+                  isCouponOpen
+                    ? "max-h-40 opacity-100 mt-1"
+                    : "max-h-0 opacity-0"
+                }`}
+              >
+                <div className="pl-10 pr-4 py-2 space-y-1">
+                  <Link
+                    to="/admin/coupons"
+                    className="block px-4 py-2 text-sm text-gray-400 hover:bg-white hover:text-black"
+                  >
+                    Coupon List
+                  </Link>
+
+                  <Link
+                    to="/admin/coupon-analytics"
+                    className="block px-4 py-2 text-sm text-gray-400 hover:bg-white hover:text-black"
+                  >
+                    Coupon Analytics
+                  </Link>
+                </div>
+              </div>
+            </div>
 
             <Link
               to="/admin/sections"
               className={`flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-white hover:text-black transition-all duration-200 font-medium group ${
-                isActive('/admin/sections') ? 'bg-white/10 text-white' : ''
+                isActive("/admin/sections") ? "bg-white/10 text-white" : ""
               }`}
             >
-              <ShoppingCart size={20} className="text-gray-400 group-hover:text-black" />
+              <ShoppingCart
+                size={20}
+                className="text-gray-400 group-hover:text-black"
+              />
               <span>Sections</span>
             </Link>
 
             <Link
               to="/admin/banners"
               className={`flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-white hover:text-black transition-all duration-200 font-medium group ${
-                isActive('/admin/banners') ? 'bg-white/10 text-white' : ''
+                isActive("/admin/banners") ? "bg-white/10 text-white" : ""
               }`}
             >
-              <FileText size={20} className="text-gray-400 group-hover:text-black" />
+              <FileText
+                size={20}
+                className="text-gray-400 group-hover:text-black"
+              />
               <span>Banner</span>
             </Link>
 
             <Link
               to="/admin/brands"
               className={`flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-white hover:text-black transition-all duration-200 font-medium group ${
-                isActive('/admin/brands') ? 'bg-white/10 text-white' : ''
+                isActive("/admin/brands") ? "bg-white/10 text-white" : ""
               }`}
             >
-              <FileText size={20} className="text-gray-400 group-hover:text-black" />
+              <FileText
+                size={20}
+                className="text-gray-400 group-hover:text-black"
+              />
               <span>Brands</span>
             </Link>
 
             <Link
               to="/admin/features"
               className={`flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-white hover:text-black transition-all duration-200 font-medium group ${
-                isActive('/admin/features') ? 'bg-white/10 text-white' : ''
+                isActive("/admin/features") ? "bg-white/10 text-white" : ""
               }`}
             >
-              <Package size={20} className="text-gray-400 group-hover:text-black" />
+              <Package
+                size={20}
+                className="text-gray-400 group-hover:text-black"
+              />
               <span>Features</span>
             </Link>
 
             <Link
               to="/admin/filters"
               className={`flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-white hover:text-black transition-all duration-200 font-medium group ${
-                isActive('/admin/filters') ? 'bg-white/10 text-white' : ''
+                isActive("/admin/filters") ? "bg-white/10 text-white" : ""
               }`}
             >
-              <Package size={20} className="text-gray-400 group-hover:text-black" />
+              <Package
+                size={20}
+                className="text-gray-400 group-hover:text-black"
+              />
               <span>Filters</span>
             </Link>
 
             <Link
               to="/admin/splash"
               className={`flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-white hover:text-black transition-all duration-200 font-medium group ${
-                isActive('/admin/splash') ? 'bg-white/10 text-white' : ''
+                isActive("/admin/splash") ? "bg-white/10 text-white" : ""
               }`}
             >
-              <Package size={20} className="text-gray-400 group-hover:text-black" />
-              <span>Splash</span>
+              <Package
+                size={20}
+                className="text-gray-400 group-hover:text-black"
+              />
+              <span>Home banners</span>
             </Link>
 
             <Link
               to="/admin/driver"
               className={`flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-white hover:text-black transition-all duration-200 font-medium group ${
-                isActive('/admin/driver') ? 'bg-white/10 text-white' : ''
+                isActive("/admin/driver") ? "bg-white/10 text-white" : ""
               }`}
             >
-              <Truck size={20} className="text-gray-400 group-hover:text-black" />
+              <Truck
+                size={20}
+                className="text-gray-400 group-hover:text-black"
+              />
               <span>Driver</span>
             </Link>
 
             <Link
               to="/admin/warehouse"
               className={`flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-white hover:text-black transition-all duration-200 font-medium group ${
-                isActive('/admin/warehouse') ? 'bg-white/10 text-white' : ''
+                isActive("/admin/warehouse") ? "bg-white/10 text-white" : ""
               }`}
             >
-              <Building2 size={20} className="text-gray-400 group-hover:text-black" />
+              <Building2
+                size={20}
+                className="text-gray-400 group-hover:text-black"
+              />
               <span>Warehouse</span>
             </Link>
 
             <Link
               to="/admin/cart-charges"
               className={`flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-white hover:text-black transition-all duration-200 font-medium group ${
-                isActive('/admin/cart-charges') ? 'bg-white/10 text-white' : ''
+                isActive("/admin/cart-charges") ? "bg-white/10 text-white" : ""
               }`}
             >
-              <Receipt size={20} className="text-gray-400 group-hover:text-black" />
+              <Receipt
+                size={20}
+                className="text-gray-400 group-hover:text-black"
+              />
               <span>Cart</span>
             </Link>
 
             <Link
               to="/admin/delivery"
               className={`flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-white hover:text-black transition-all duration-200 font-medium group ${
-                isActive('/admin/delivery') ? 'bg-white/10 text-white' : ''
+                isActive("/admin/delivery") ? "bg-white/10 text-white" : ""
               }`}
             >
-              <GrDeliver size={20} className="text-gray-400 group-hover:text-black" />
+              <GrDeliver
+                size={20}
+                className="text-gray-400 group-hover:text-black"
+              />
               <span>Delivery</span>
             </Link>
 
             <Link
               to="/admin/pincode"
               className={`flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-white hover:text-black transition-all duration-200 font-medium group ${
-                isActive('/admin/pincode') ? 'bg-white/10 text-white' : ''
+                isActive("/admin/pincode") ? "bg-white/10 text-white" : ""
               }`}
             >
-              <Receipt size={20} className="text-gray-400 group-hover:text-black" />
+              <Receipt
+                size={20}
+                className="text-gray-400 group-hover:text-black"
+              />
               <span>Pincode</span>
             </Link>
 
@@ -285,25 +410,76 @@ const Sidebar = () => {
               <div className="px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
                 Panel Management
               </div>
-              
+
               <Link
                 to="/admin/subadmin"
                 className={`flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-white hover:text-black transition-all duration-200 font-medium group ${
-                  isActive('/admin/subadmin') ? 'bg-white/10 text-white' : ''
+                  isActive("/admin/subadmin") ? "bg-white/10 text-white" : ""
                 }`}
               >
-                <UserPlus size={20} className="text-gray-400 group-hover:text-black" />
+                <UserPlus
+                  size={20}
+                  className="text-gray-400 group-hover:text-black"
+                />
                 <span>Sub Admin</span>
               </Link>
 
+              {/* Influencer Dropdown */}
+              <div>
+                <button
+                  onClick={() => setIsInfluencerOpen(!isInfluencerOpen)}
+                  className="w-full flex items-center justify-between px-4 py-3 text-gray-300 hover:bg-white hover:text-black transition-all duration-200 font-medium group"
+                >
+                  <div className="flex items-center gap-3">
+                    <Users
+                      size={20}
+                      className="text-gray-400 group-hover:text-black"
+                    />
+                    <span>Influencer</span>
+                  </div>
+                  {isInfluencerOpen ? (
+                    <ChevronDown size={18} className="text-gray-400" />
+                  ) : (
+                    <ChevronRight size={18} className="text-gray-400" />
+                  )}
+                </button>
+
+                <div
+                  className={`overflow-hidden transition-all duration-300 ${
+                    isInfluencerOpen
+                      ? "max-h-40 opacity-100 mt-1"
+                      : "max-h-0 opacity-0"
+                  }`}
+                >
+                  <div className="pl-10 pr-4 py-2 space-y-1">
+                    <Link
+                      to="/admin/influencer"
+                      className="block px-4 py-2 text-sm text-gray-400 hover:bg-white hover:text-black"
+                    >
+                      Influencer List
+                    </Link>
+
+                    <Link
+                      to="/admin/influencer/coupons"
+                      className="block px-4 py-2 text-sm text-gray-400 hover:bg-white hover:text-black"
+                    >
+                      Influencer Coupons
+                    </Link>
+                  </div>
+                </div>
+              </div>
+
               <Link
-                to="/admin/influencer"
+                to="/admin/driver"
                 className={`flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-white hover:text-black transition-all duration-200 font-medium group ${
-                  isActive('/admin/influencer') ? 'bg-white/10 text-white' : ''
+                  isActive("/admin/driver") ? "bg-white/10 text-white" : ""
                 }`}
               >
-                <Users size={20} className="text-gray-400 group-hover:text-black" />
-                <span>Influencer</span>
+                <Truck
+                  size={20}
+                  className="text-gray-400 group-hover:text-black"
+                />
+                <span>Driver</span>
               </Link>
             </div>
           </div>
@@ -315,17 +491,20 @@ const Sidebar = () => {
             to="/admin/settings"
             className="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-white/10 hover:text-white transition-all duration-200 font-medium group mb-2"
           >
-            <Settings size={20} className="text-gray-400 group-hover:text-white" />
+            <Settings
+              size={20}
+              className="text-gray-400 group-hover:text-white"
+            />
             <span>Settings</span>
           </Link>
 
-          <button 
+          <button
             onClick={handleLogout}
             disabled={isLoggingOut}
             className="w-full flex items-center gap-3 px-4 py-3 text-red-400 hover:bg-red-950/40 hover:text-red-300 transition-all duration-200 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <LogOut size={20} />
-            <span>{isLoggingOut ? 'Logging out...' : 'Logout'}</span>
+            <span>{isLoggingOut ? "Logging out..." : "Logout"}</span>
           </button>
         </div>
       </aside>

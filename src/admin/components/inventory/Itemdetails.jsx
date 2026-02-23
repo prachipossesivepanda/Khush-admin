@@ -157,7 +157,7 @@ export default function ItemDetails() {
         {/* Tabs - scrollable only when necessary */}
         <div className="border-b border-gray-200 mb-4 sm:mb-6 lg:mb-8 bg-white rounded-t-xl">
           <div className="flex gap-2 sm:gap-3 md:gap-4 lg:gap-6 overflow-x-auto pb-3 px-4 sm:px-5 lg:px-6 scrollbar-thin scrollbar-thumb-gray-300">
-            {["general", "variants", "size", "care", "filters"].map((tab) => (
+            {["general", "variants", "size", "care", "policies", "filters"].map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
@@ -338,6 +338,150 @@ export default function ItemDetails() {
               ) : activeTab === "care" ? (
                 <p className="text-gray-500 py-6 sm:py-8 text-center text-sm sm:text-base">No care instructions available</p>
               ) : null}
+
+              {/* POLICIES */}
+              {activeTab === "policies" && (
+                <div className="space-y-6 sm:space-y-8">
+                  {/* Shipping Policy */}
+                  {item.shipping && (
+                    <div className="border border-gray-200 rounded-xl p-4 sm:p-5 md:p-6 bg-gray-50">
+                      <div className="flex items-start gap-3 sm:gap-4">
+                        {item.shipping.iconUrl && (
+                          <img
+                            src={item.shipping.iconUrl}
+                            alt="Shipping"
+                            className="w-8 h-8 sm:w-10 sm:h-10 flex-shrink-0"
+                          />
+                        )}
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-base sm:text-lg text-gray-900 mb-2">
+                            {item.shipping.title || "Shipping Policy"}
+                          </h3>
+                          {item.shipping.description && (
+                            <p className="text-sm sm:text-base text-gray-700">
+                              {item.shipping.description}
+                            </p>
+                          )}
+                          {item.shipping.estimatedDelivery && (
+                            <p className="text-sm text-gray-600 mt-2">
+                              {item.shipping.estimatedDelivery}
+                            </p>
+                          )}
+                          {item.shipping.shippingCharges !== undefined && item.shipping.shippingCharges !== null && (
+                            <p className="text-sm text-gray-600 mt-1">
+                              Shipping Charges: ₹{item.shipping.shippingCharges}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* COD Policy */}
+                  {item.codPolicy && (
+                    <div className="border border-gray-200 rounded-xl p-4 sm:p-5 md:p-6 bg-gray-50">
+                      <div className="flex items-start gap-3 sm:gap-4">
+                        {item.codPolicy.iconUrl && (
+                          <img
+                            src={item.codPolicy.iconUrl}
+                            alt="COD"
+                            className="w-8 h-8 sm:w-10 sm:h-10 flex-shrink-0"
+                          />
+                        )}
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-base sm:text-lg text-gray-900 mb-2">
+                            COD Policy
+                          </h3>
+                          {item.codPolicy.text && (
+                            <p className="text-sm sm:text-base text-gray-700">
+                              {item.codPolicy.text}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Return Policy */}
+                  {item.returnPolicy && (
+                    <div className="border border-gray-200 rounded-xl p-4 sm:p-5 md:p-6 bg-gray-50">
+                      <div className="flex items-start gap-3 sm:gap-4">
+                        {item.returnPolicy.iconUrl && (
+                          <img
+                            src={item.returnPolicy.iconUrl}
+                            alt="Return"
+                            className="w-8 h-8 sm:w-10 sm:h-10 flex-shrink-0"
+                          />
+                        )}
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-base sm:text-lg text-gray-900 mb-2">
+                            Return Policy
+                          </h3>
+                          {item.returnPolicy.text && (
+                            <p className="text-sm sm:text-base text-gray-700">
+                              {item.returnPolicy.text}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Exchange Policy */}
+                  {item.exchangePolicy && (
+                    <div className="border border-gray-200 rounded-xl p-4 sm:p-5 md:p-6 bg-gray-50">
+                      <div className="flex items-start gap-3 sm:gap-4">
+                        {item.exchangePolicy.iconUrl && (
+                          <img
+                            src={item.exchangePolicy.iconUrl}
+                            alt="Exchange"
+                            className="w-8 h-8 sm:w-10 sm:h-10 flex-shrink-0"
+                          />
+                        )}
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-base sm:text-lg text-gray-900 mb-2">
+                            Exchange Policy
+                          </h3>
+                          {item.exchangePolicy.text && (
+                            <p className="text-sm sm:text-base text-gray-700 whitespace-pre-line">
+                              {item.exchangePolicy.text}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Cancellation Policy */}
+                  {item.cancellationPolicy && (
+                    <div className="border border-gray-200 rounded-xl p-4 sm:p-5 md:p-6 bg-gray-50">
+                      <div className="flex items-start gap-3 sm:gap-4">
+                        {item.cancellationPolicy.iconUrl && (
+                          <img
+                            src={item.cancellationPolicy.iconUrl}
+                            alt="Cancellation"
+                            className="w-8 h-8 sm:w-10 sm:h-10 flex-shrink-0"
+                          />
+                        )}
+                        <div className="flex-1">
+                          <h3 className="font-semibold text-base sm:text-lg text-gray-900 mb-2">
+                            Cancellation Policy
+                          </h3>
+                          {item.cancellationPolicy.text && (
+                            <p className="text-sm sm:text-base text-gray-700 whitespace-pre-line">
+                              {item.cancellationPolicy.text}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {!item.shipping && !item.codPolicy && !item.returnPolicy && !item.exchangePolicy && !item.cancellationPolicy && (
+                    <p className="text-gray-500 py-6 sm:py-8 text-center text-sm sm:text-base">No policies available</p>
+                  )}
+                </div>
+              )}
 
               {/* FILTERS */}
               {activeTab === "filters" && (

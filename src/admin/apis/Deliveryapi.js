@@ -14,8 +14,8 @@ export const createDelivery = (data) => {
 };
 
 // 🔹 Get All Deliveries
-export const getDeliveries = () => {
-  return apiConnector("GET", deliveryEndpoints.GET_DELIVERIES);
+export const getDeliveries = (page = 1, limit = 10) => {
+  return apiConnector("GET", deliveryEndpoints.GET_DELIVERIES, null, null, { page, limit });
 };
 
 // 🔹 Update Delivery

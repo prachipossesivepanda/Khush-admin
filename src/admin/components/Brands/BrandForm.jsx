@@ -89,25 +89,25 @@ const BrandForm = () => {
   };
 
   return (
-    <div className="w-full min-h-screen bg-gray-50/70">
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-        {/* Professional Back Button */}
-        <button
-          onClick={() => navigate("/admin/brands")}
-          className="mb-6 flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors group"
-        >
-          <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
-          <span>Back to Brands</span>
-        </button>
-
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
-            {isEdit ? "Edit Brand" : "Create New Brand"}
-          </h1>
-          <p className="mt-2 text-sm text-gray-500">
-            {isEdit ? "Update brand information" : "Add a new brand to your inventory"}
-          </p>
+    <div className="w-full min-h-screen bg-gray-50">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        {/* Header with Back Button and Title on Right */}
+        <div className="flex items-center justify-between mb-8">
+          <button
+            onClick={() => navigate("/admin/brands")}
+            className="flex items-center gap-2 text-sm font-medium text-gray-600 hover:text-gray-900 transition-colors group"
+          >
+            <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
+            <span>Back</span>
+          </button>
+          <div className="text-right">
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
+              {isEdit ? "Edit Brand" : "Create Brand"}
+            </h1>
+            <p className="mt-1 text-sm text-gray-500">
+              {isEdit ? "Update brand information" : "Add a new brand"}
+            </p>
+          </div>
         </div>
 
         {/* Form Card */}

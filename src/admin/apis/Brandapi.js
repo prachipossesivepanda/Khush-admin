@@ -20,8 +20,8 @@ export const createBrand = (data) => {
 };
 
 // ✅ GET BRANDS
-export const getBrands = () => {
-  return apiConnector("GET", brandEndpoints.GET_BRANDS);
+export const getBrands = (page = 1, limit = 10) => {
+  return apiConnector("GET", brandEndpoints.GET_BRANDS, null, null, { page, limit });
 };
 
 // ✅ UPDATE BRAND

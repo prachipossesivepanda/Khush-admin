@@ -1,169 +1,235 @@
-// src/admin/components/Dashboard/Dashboard.jsx
-import { ShoppingBag, Shirt, Users, Package, Layers, Tag } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-// import Khush from "../../../assets/images/logo.png";
-const StatCard = ({ title, value, icon, trend, onClick }) => {
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { getItemsCount, getCategoryCount, getSubcategoryCount } from "../../apis/Dashboardapi";
+import { getFeaturedImages } from "../../apis/Bannerapi";
+import { ZoomIn, X } from "lucide-react";
+
+export default function Dashboard() {
+  const [counts, setCounts] = useState({});
+  const [banners, setBanners] = useState([]);
+  const [loadingBanners, setLoadingBanners] = useState(false);
+  const [zoomedImage, setZoomedImage] = useState(null);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const fetchCounts = async () => {
+      try {
+        const [itemsRes, categoriesRes, subcategoriesRes] = await Promise.all([
+          getItemsCount(),
+          getCategoryCount(),
+          getSubcategoryCount()
+        ]);
+
+        setCounts({
+          Items: {
+            total: itemsRes.data.items.totalItems,
+            active: itemsRes.data.items.activeItems,
+            inactive: itemsRes.data.items.inactiveItems,
+            path: "/admin/items"
+          },
+          Categories: {
+            total: categoriesRes.data.categories.totalCategories,
+            active: categoriesRes.data.categories.activeCategories,
+            inactive: categoriesRes.data.categories.inactiveCategories,
+            path: "/admin/inventory/categories"
+          },
+          Subcategories: {
+            total: subcategoriesRes.data.subcategories.totalSubCategories,
+            active: subcategoriesRes.data.subcategories.activeSubCategories,
+            inactive: subcategoriesRes.data.subcategories.inactiveSubCategories,
+            path: "/admin/subcategoriess"
+          }
+        });
+
+      } catch (err) {
+        console.error("Dashboard count error:", err);
+      }
+    };
+
+    fetchCounts();
+    fetchBanners();
+  }, []);
+
+  const fetchBanners = async () => {
+    try {
+      setLoadingBanners(true);
+      const response = await getFeaturedImages("", 1, 10);
+      const responseData = response?.data || {};
+      const imagesArray = responseData.data || [];
+      setBanners(Array.isArray(imagesArray) ? imagesArray : []);
+    } catch (err) {
+      console.error("Dashboard banners error:", err);
+    } finally {
+      setLoadingBanners(false);
+    }
+  };
+
+  const cardClass =
+    "bg-white shadow rounded-lg p-6 flex flex-col justify-between w-full sm:w-60 cursor-pointer hover:shadow-lg transition";
+  const cardHeaderClass = "text-lg font-semibold mb-2 text-gray-700";
+  const cardCountClass = "text-3xl font-bold text-gray-900";
+  const statusLabelClass = "text-sm font-medium text-gray-500 mt-1";
+
   return (
-    <div
-      onClick={onClick}
-      className={`
-        group relative bg-white p-4 sm:p-6 lg:p-7 shadow border border-gray-100
-        hover:shadow-xl hover:border-gray-200 hover:-translate-y-1 
-        transition-all duration-300 ease-out
-        overflow-hidden rounded-lg sm:rounded-xl
-        ${onClick ? 'cursor-pointer' : ''}
-      `}
-    >
-      {/* Top accent line */}
-      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-gray-900 via-gray-700 to-gray-900 opacity-90"></div>
+    <div className="min-h-screen bg-gray-50 p-6">
+      <h1 className="text-3xl font-bold mb-6">Dashboard</h1>
 
-      <div className="flex items-start justify-between gap-3 sm:gap-4">
-        <div className="space-y-1 sm:space-y-2 flex-1 min-w-0">
-          <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-gray-500 truncate">
-            {title}
-          </p>
-          <p className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 tracking-tight break-words">
-            {value}
-          </p>
-        </div>
-
-        <div
-          className={`
-            flex-shrink-0 p-2 sm:p-3 lg:p-4 bg-gray-50 text-gray-700 
-            group-hover:bg-gray-900 group-hover:text-white 
-            transition-colors duration-300 rounded-lg
-          `}
-        >
-          <div className="w-5 h-5 sm:w-6 sm:h-6 lg:w-7 lg:h-7">
-            {icon}
+      {/* Stats Cards */}
+      <div className="flex flex-wrap gap-6 mb-8">
+        {Object.entries(counts).map(([key, value]) => (
+          <div
+            key={key}
+            className={cardClass}
+            onClick={() => navigate(value.path)}
+          >
+            <div className={cardHeaderClass}>{key}</div>
+            <div className={cardCountClass}>{value.total}</div>
+            <div className="mt-3">
+              <p className={statusLabelClass}>
+                Active: <span className="text-green-600">{value.active}</span>
+              </p>
+              <p className={statusLabelClass}>
+                Inactive: <span className="text-red-600">{value.inactive}</span>
+              </p>
+            </div>
           </div>
-        </div>
+        ))}
       </div>
 
-      {trend && (
-        <div className="mt-3 sm:mt-4 flex items-center gap-2 text-xs sm:text-sm">
-          <span
-            className={`
-              font-medium flex items-center gap-1
-              ${trend.isPositive ? 'text-emerald-600' : 'text-rose-600'}
-            `}
+      {/* Banners Table */}
+      {/* <div className="bg-white shadow rounded-lg overflow-hidden">
+        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+          <h2 className="text-xl font-semibold text-gray-900">Admin Banners</h2>
+          <button
+            onClick={() => navigate("/admin/banners")}
+            className="text-sm text-gray-600 hover:text-black font-medium"
           >
-            {trend.isPositive ? '↑' : '↓'} {trend.value}
-          </span>
-          <span className="text-gray-500 hidden sm:inline">vs last month</span>
-          <span className="text-gray-500 sm:hidden">vs last</span>
+            View All →
+          </button>
+        </div>
+        
+        {loadingBanners ? (
+          <div className="p-8 text-center text-gray-500">Loading banners...</div>
+        ) : banners.length === 0 ? (
+          <div className="p-8 text-center text-gray-500">
+            No banners found. <button onClick={() => navigate("/admin/banners/create")} className="text-black hover:underline font-medium">Create one →</button>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Image</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Heading</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Subheading</th>
+                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Page</th>
+                  <th className="px-6 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {banners.slice(0, 5).map((banner) => {
+                  const isVideo = /\.(mp4|webm|ogg|mov|avi|mkv)(\?.*)?$/i.test(banner.url) || 
+                                 banner.url.includes('video') ||
+                                 banner.key?.includes('video');
+                  
+                  return (
+                    <tr key={banner._id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-6 py-4">
+                        <div 
+                          className="relative w-20 h-20 rounded-lg overflow-hidden cursor-pointer group"
+                          onClick={() => setZoomedImage(banner)}
+                        >
+                          {isVideo ? (
+                            <video
+                              src={banner.url}
+                              className="w-full h-full object-cover"
+                              muted
+                              loop
+                              playsInline
+                            />
+                          ) : (
+                            <img
+                              src={banner.url}
+                              alt={banner.heading || "banner"}
+                              className="w-full h-full object-cover"
+                            />
+                          )}
+                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all flex items-center justify-center">
+                            <ZoomIn className="text-white opacity-0 group-hover:opacity-100 transition-opacity" size={20} />
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-sm font-medium text-gray-900 max-w-xs truncate">
+                          {banner.heading || "—"}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="text-sm text-gray-600 max-w-xs truncate">
+                          {banner.subHeading || "—"}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-700">
+                          {banner.page || "—"}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <button
+                          onClick={() => navigate(`/admin/banners/edit/${banner._id}`)}
+                          className="text-blue-600 hover:text-blue-700 font-medium text-sm"
+                        >
+                          Edit
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div> */}
+
+      {/* Image Zoom Modal */}
+      {zoomedImage && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4"
+          onClick={() => setZoomedImage(null)}
+        >
+          <div className="relative max-w-[95vw] max-h-[90vh]">
+            <button
+              onClick={() => setZoomedImage(null)}
+              className="absolute -top-10 right-0 text-white hover:text-gray-300 transition-colors"
+            >
+              <X size={24} />
+            </button>
+            {/\.(mp4|webm|ogg|mov|avi|mkv)(\?.*)?$/i.test(zoomedImage.url) || 
+             zoomedImage.url.includes('video') ||
+             zoomedImage.key?.includes('video') ? (
+              <video
+                src={zoomedImage.url}
+                controls
+                className="max-w-full max-h-[90vh] w-auto h-auto"
+                onClick={(e) => e.stopPropagation()}
+              />
+            ) : (
+              <img
+                src={zoomedImage.url}
+                alt={zoomedImage.heading || "zoomed image"}
+                className="max-w-full max-h-[90vh] w-auto h-auto"
+                onClick={(e) => e.stopPropagation()}
+              />
+            )}
+            {(zoomedImage.heading || zoomedImage.subHeading) && (
+              <div className="mt-4 text-white text-center">
+                {zoomedImage.heading && <p className="font-semibold">{zoomedImage.heading}</p>}
+                {zoomedImage.subHeading && <p className="text-sm text-gray-300">{zoomedImage.subHeading}</p>}
+              </div>
+            )}
+          </div>
         </div>
       )}
     </div>
   );
-};
-
-const Dashboard = () => {
-  const navigate = useNavigate();
-
-  const stats = [
-    {
-      title: "Total Categories",
-      value: "28",
-      icon: <Layers size={28} strokeWidth={1.8} />,
-      trend: { value: "4", isPositive: true },
-      route: "/admin/inventory/categories",
-    },
-    {
-      title: "Subcategories",
-      value: "94",
-      icon: <Tag size={28} strokeWidth={1.8} />,
-      trend: { value: "7", isPositive: true },
-      route: "/admin/inventory/subcategories", // Navigate to categories to access subcategories
-    },
-    {
-      title: "Total Products",
-      value: "1,672",
-      icon: <Shirt size={28} strokeWidth={1.8} />,
-      trend: { value: "93", isPositive: true },
-      route: "/admin/inventory/i", // Navigate to categories first to access products
-    },
-    {
-      title: "Registered Users",
-      value: "14,920",
-      icon: <Users size={28} strokeWidth={1.8} />,
-      trend: { value: "12%", isPositive: true },
-      route: null, // No page available yet
-    },
-    {
-      title: "Total Orders",
-      value: "42,310",
-      icon: <ShoppingBag size={28} strokeWidth={1.8} />,
-      trend: { value: "3.8%", isPositive: false },
-      route: null, // No page available yet
-    },
-    {
-      title: "Pending Orders",
-      value: "187",
-      icon: <Package size={28} strokeWidth={1.8} />,
-      route: null, // No page available yet
-    },
-  ];
-
-  const handleCardClick = (route) => {
-    if (route) {
-      console.log("📊 Dashboard card clicked, navigating to:", route);
-      navigate(route);
-    } else {
-      console.log("⚠️ No route defined for this card");
-    }
-  };
-
-  return (
-    <div className="w-full min-h-screen bg-gray-50/70">
-      {/* Header - stays visible above fold */}
-      <div className="border-b border-gray-200 bg-white sticky top-0 z-10">
-        <div className="px-4 sm:px-6 lg:px-8 py-4 sm:py-6 lg:py-8">
-          <div className="flex items-center justify-start gap-3 sm:gap-4">
-            {/* <img
-              src={Khush}
-              alt="Khush Logo"
-              className="h-12 w-12 sm:h-16 sm:w-16 lg:h-20 lg:w-20 object-contain"
-            /> */}
-
-            <div>
-              <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold text-gray-900 tracking-tight">
-                Khush Admin
-              </h1>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <main className="px-4 sm:px-6 lg:px-8 py-6 sm:py-8 lg:py-10">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 lg:gap-6 xl:gap-8">
-          {stats.map((stat, index) => (
-            <StatCard
-              key={index}
-              title={stat.title}
-              value={stat.value}
-              icon={stat.icon}
-              trend={stat.trend}
-              onClick={() => handleCardClick(stat.route)}
-            />
-          ))}
-        </div>
-
-        {/* Future sections – recommended next additions */}
-        {/* 
-        <div className="mt-12 grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow h-96">
-            Recent Orders
-          </div>
-          <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow h-96">
-            Top Products / Revenue Chart
-          </div>
-        </div>
-        */}
-      </main>
-    </div>
-  );
-};
-
-export default Dashboard;
+}
