@@ -30,27 +30,29 @@ export default function Warehouse() {
   const [pincodes, setPincodes] = useState([]);
   const [pincodeLoading, setPincodeLoading] = useState(false);
   const [newPincode, setNewPincode] = useState("");
+  const [pincodeSearch, setPincodeSearch] = useState("");
+  const [pincodePage, setPincodePage] = useState(1);
+  const PINCODE_LIMIT = 10;
 
   // Stock Modal State
   const [showStockModal, setShowStockModal] = useState(false);
   const [stock, setStock] = useState([]);
   const [stockLoading, setStockLoading] = useState(false);
   const [stockForm, setStockForm] = useState({ sku: "", quantity: "" });
+  const [stockSearch, setStockSearch] = useState("");
+  const [stockPage, setStockPage] = useState(1);
+  const STOCK_LIMIT = 10;
 
-  // Debounce search term to avoid too many API calls
+  // Debounce search for main warehouses list
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearchTerm(searchTerm);
-    }, 500); // Wait 500ms after user stops typing
-
+    }, 500);
     return () => clearTimeout(timer);
   }, [searchTerm]);
 
-  // Reset to page 1 when search term changes
   useEffect(() => {
-    if (debouncedSearchTerm !== searchTerm) {
-      setCurrentPage(1);
-    }
+    setCurrentPage(1);
   }, [debouncedSearchTerm]);
 
   useEffect(() => {
@@ -62,31 +64,25 @@ export default function Warehouse() {
     try {
       const response = await getWarehouses(currentPage, limit, debouncedSearchTerm);
       const data = response?.data?.data || response?.data || {};
-      
       const warehouseList = data.warehouses || data.items || data || [];
+
       const formatted = warehouseList.map((wh, idx) => {
         const addr = wh.address || {};
-      
         return {
           id: wh._id || wh.id || `temp-${idx}`,
           name: wh.name || "",
-      
-          // Convert object to readable string
           address: addr.line
             ? `${addr.line}, ${addr.city}, ${addr.state} - ${addr.pinCode}, ${addr.country}`
             : "—",
-      
           city: addr.city || "—",
           state: addr.state || "—",
           pincode: addr.pinCode || "—",
-      
           phone: wh.phone || "—",
           email: wh.email || "",
           isActive: wh.isActive !== false,
           createdAt: wh.createdAt || "",
         };
       });
-      
 
       setWarehouses(formatted);
       setTotalPages(data.totalPages || data.pages || 1);
@@ -99,10 +95,11 @@ export default function Warehouse() {
     }
   };
 
-  const filteredWarehouses = warehouses.filter((wh) =>
-    wh.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    wh.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    wh.state.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredWarehouses = warehouses.filter(
+    (wh) =>
+      wh.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      wh.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      wh.state.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const handleToggleActive = async (warehouse) => {
@@ -127,10 +124,7 @@ export default function Warehouse() {
   };
 
   const handleDelete = async (warehouseId) => {
-    if (!window.confirm("Are you sure you want to delete this warehouse?")) {
-      return;
-    }
-
+    if (!window.confirm("Are you sure you want to delete this warehouse?")) return;
     try {
       await deleteWarehouse(warehouseId);
       fetchWarehouses();
@@ -143,166 +137,102 @@ export default function Warehouse() {
     navigate(`/admin/warehouse/edit/${warehouse.id}`);
   };
 
-  // Pincode Management
+  // ────────────────────────────────────────────────
+  //                   PINCODE MANAGEMENT
+  // ────────────────────────────────────────────────
+
   const handleManagePincodes = async (warehouse) => {
-    console.log("🔵 handleManagePincodes called with warehouse:", warehouse);
     setSelectedWarehouse(warehouse);
     setShowPincodeModal(true);
     setPincodeLoading(true);
+    setPincodeSearch("");
+    setPincodePage(1);
+
     try {
-      console.log("🔵 Fetching pincodes for warehouse ID:", warehouse.id);
       const response = await getWarehousePincodes(warehouse.id);
-      console.log("🔵 Full API response:", response);
-      console.log("🔵 response type:", typeof response);
-      console.log("🔵 response.data:", response?.data);
-      console.log("🔵 response.data type:", typeof response?.data);
-      console.log("🔵 Is response.data an array?", Array.isArray(response?.data));
-      
-      // API connector returns response.data, so response is already the data object
-      // The structure is: { success: true, message: "...", data: [...] }
       const pincodeList = response?.data || (Array.isArray(response) ? response : []);
-      console.log("🔵 Extracted pincodeList:", pincodeList);
-      console.log("🔵 pincodeList length:", pincodeList.length);
-      console.log("🔵 pincodeList is array?", Array.isArray(pincodeList));
       setPincodes(pincodeList);
-      console.log("🔵 Pincodes state set successfully");
     } catch (err) {
-      console.error("❌ Error loading pincodes:", err);
-      console.error("❌ Error response:", err.response);
-      console.error("❌ Error message:", err.message);
+      console.error("Error loading pincodes:", err);
       setError("Failed to load pincodes");
     } finally {
       setPincodeLoading(false);
-      console.log("🔵 Pincode loading finished");
     }
   };
 
   const handleAddPincode = async () => {
-    console.log("🟢 handleAddPincode called");
-    console.log("🟢 newPincode value:", newPincode);
-    console.log("🟢 selectedWarehouse:", selectedWarehouse);
-    
     if (!newPincode.trim()) {
-      console.log("❌ Pincode is empty, showing alert");
       alert("Please enter a pincode");
       return;
     }
 
     try {
-      const pincodeToAdd = newPincode.trim();
-      console.log("🟢 Adding pincode:", pincodeToAdd);
-      console.log("🟢 Warehouse ID:", selectedWarehouse.id);
-      
-      // API expects pinCode (not pincodes array)
-      const payload = { pinCode: pincodeToAdd };
-      console.log("🟢 Payload:", payload);
-      
-      const addResponse = await addWarehousePincodes(selectedWarehouse.id, payload);
-      console.log("🟢 Add pincode API response:", addResponse);
-      console.log("🟢 Add pincode response.data:", addResponse?.data);
-      
+      const payload = { pinCode: newPincode.trim() };
+      await addWarehousePincodes(selectedWarehouse.id, payload);
       setNewPincode("");
-      console.log("🟢 Cleared newPincode input");
-      
-      // Reload pincodes
-      console.log("🟢 Reloading pincodes after add...");
+
+      // Refresh list
       const response = await getWarehousePincodes(selectedWarehouse.id);
-      console.log("🟢 Reload response:", response);
-      console.log("🟢 Reload response type:", typeof response);
-      console.log("🟢 Reload response.data:", response?.data);
-      console.log("🟢 Is response.data an array?", Array.isArray(response?.data));
-      
-      // API connector returns response.data, so response is already the data object
       const pincodeList = response?.data || (Array.isArray(response) ? response : []);
-      console.log("🟢 Reloaded pincodeList:", pincodeList);
-      console.log("🟢 Reloaded pincodeList length:", pincodeList.length);
-      console.log("🟢 Reloaded pincodeList is array?", Array.isArray(pincodeList));
-      
       setPincodes(pincodeList);
-      console.log("🟢 Pincodes updated successfully");
     } catch (err) {
-      console.error("❌ Error adding pincode:", err);
-      console.error("❌ Error type:", typeof err);
-      console.error("❌ Error is string?", typeof err === 'string');
-      
-      // API connector returns error as string, not error object
-      const errorMessage = typeof err === 'string' 
-        ? err 
-        : (err.response?.data?.message || err.message || "Failed to add pincode");
-      
-      console.error("❌ Final error message:", errorMessage);
-      alert(errorMessage);
-      
-      // If it's a duplicate/already exists error, reload the list to show the existing pincode
-      if (errorMessage.toLowerCase().includes("already") || 
-          errorMessage.toLowerCase().includes("duplicate") ||
-          errorMessage.toLowerCase().includes("linked")) {
-        console.log("🟢 Reloading pincodes due to duplicate error...");
+      const msg =
+        typeof err === "string"
+          ? err
+          : err.response?.data?.message || "Failed to add pincode";
+      alert(msg);
+
+      // Still refresh on duplicate error
+      if (msg.toLowerCase().includes("already") || msg.toLowerCase().includes("duplicate")) {
         try {
           const response = await getWarehousePincodes(selectedWarehouse.id);
-          console.log("🟢 Duplicate error reload response:", response);
-          // API connector returns response.data, so response is already the data object
-          const pincodeList = response?.data || (Array.isArray(response) ? response : []);
-          console.log("🟢 Reloaded pincodes after duplicate error:", pincodeList);
+          const pincodeList = response?.data || [];
           setPincodes(pincodeList);
-          setNewPincode("");
-        } catch (reloadErr) {
-          console.error("❌ Error reloading pincodes:", reloadErr);
-        }
+        } catch {}
       }
     }
   };
 
   const handleDeletePincode = async (pincodeId) => {
-    console.log("🔴 handleDeletePincode called");
-    console.log("🔴 pincodeId to delete:", pincodeId);
-    console.log("🔴 selectedWarehouse:", selectedWarehouse);
-    
-    if (!window.confirm("Are you sure you want to remove this pincode?")) {
-      console.log("🔴 User cancelled deletion");
-      return;
-    }
+    if (!window.confirm("Remove this pincode?")) return;
 
     try {
-      console.log("🔴 Deleting pincode with ID:", pincodeId);
-      console.log("🔴 Warehouse ID:", selectedWarehouse.id);
-      
-      const deleteResponse = await deleteWarehousePincode(selectedWarehouse.id, pincodeId);
-      console.log("🔴 Delete API response:", deleteResponse);
-      console.log("🔴 Delete response.data:", deleteResponse?.data);
-      
-      // Reload pincodes
-      console.log("🔴 Reloading pincodes after delete...");
+      await deleteWarehousePincode(selectedWarehouse.id, pincodeId);
       const response = await getWarehousePincodes(selectedWarehouse.id);
-      console.log("🔴 Reload response:", response);
-      console.log("🔴 Reload response type:", typeof response);
-      console.log("🔴 Reload response.data:", response?.data);
-      console.log("🔴 Is response.data an array?", Array.isArray(response?.data));
-      
-      // API connector returns response.data, so response is already the data object
-      const pincodeList = response?.data || (Array.isArray(response) ? response : []);
-      console.log("🔴 Reloaded pincodeList:", pincodeList);
-      console.log("🔴 Reloaded pincodeList length:", pincodeList.length);
-      console.log("🔴 Reloaded pincodeList is array?", Array.isArray(pincodeList));
-      
+      const pincodeList = response?.data || [];
       setPincodes(pincodeList);
-      console.log("🔴 Pincodes updated after delete");
     } catch (err) {
-      console.error("❌ Error deleting pincode:", err);
-      console.error("❌ Error response:", err.response);
-      console.error("❌ Error response.data:", err.response?.data);
-      console.error("❌ Error message:", err.message);
       alert(err.response?.data?.message || "Failed to delete pincode");
     }
   };
 
-  // Stock Management
+  const filteredPincodes = pincodes.filter((pin) => {
+    const val =
+      pin?.pincodeId?.pinCode ||
+      pin?.pinCode ||
+      pin?.pincode ||
+      (typeof pin === "string" ? pin : "");
+    return val.toString().includes(pincodeSearch.trim());
+  });
+
+  const paginatedPincodes = filteredPincodes.slice(
+    (pincodePage - 1) * PINCODE_LIMIT,
+    pincodePage * PINCODE_LIMIT
+  );
+
+  // ────────────────────────────────────────────────
+  //                     STOCK MANAGEMENT
+  // ────────────────────────────────────────────────
+
   const handleManageStock = async (warehouse) => {
     setSelectedWarehouse(warehouse);
     setShowStockModal(true);
     setStockLoading(true);
+    setStockSearch("");
+    setStockPage(1);
+
     try {
-      const response = await getWarehouseStock(warehouse.id, 1, 100);
+      const response = await getWarehouseStock(warehouse.id, 1, 500); // larger limit for client-side paging
       const data = response?.data?.data || response?.data || {};
       setStock(data.stock || data.items || data || []);
     } catch (err) {
@@ -325,8 +255,9 @@ export default function Warehouse() {
         quantity: Number(stockForm.quantity),
       });
       setStockForm({ sku: "", quantity: "" });
-      // Reload stock
-      const response = await getWarehouseStock(selectedWarehouse.id, 1, 100);
+
+      // Refresh
+      const response = await getWarehouseStock(selectedWarehouse.id, 1, 500);
       const data = response?.data?.data || response?.data || {};
       setStock(data.stock || data.items || data || []);
     } catch (err) {
@@ -334,8 +265,19 @@ export default function Warehouse() {
     }
   };
 
+  const filteredStock = stock.filter((item) =>
+    `${item.sku || ""} ${item.productName || ""} ${item.name || ""}`
+      .toLowerCase()
+      .includes(stockSearch.toLowerCase().trim())
+  );
+
+  const paginatedStock = filteredStock.slice(
+    (stockPage - 1) * STOCK_LIMIT,
+    stockPage * STOCK_LIMIT
+  );
+
   return (
-    <div className="w-full min-h-screen bg-white overflow-x-hidden">
+    <div className="w-full min-h-screen bg-white table-fixed">
       {/* Header */}
       <div className="sticky top-0 z-10 border-b border-gray-200 bg-white/95 backdrop-blur-sm">
         <div className="px-4 sm:px-6 py-3 sm:py-4">
@@ -347,19 +289,19 @@ export default function Warehouse() {
 
       <div className="px-4 sm:px-6 py-4 sm:py-6">
         {/* Controls */}
-        <div className="mb-4 sm:mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+        <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <input
             type="text"
-            placeholder="Search warehouses..."
+            placeholder="Search by name, city or state..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="flex-1 min-w-0 rounded-lg border border-gray-300 px-4 py-2.5 text-sm text-gray-700 placeholder-gray-400 shadow-sm focus:border-black focus:ring-1 focus:ring-black transition-all bg-white"
+            className="flex-1 min-w-0 rounded-lg border border-gray-300 px-4 py-2.5 text-sm focus:border-black focus:ring-1 focus:ring-black"
           />
           <button
             onClick={() => navigate("/admin/warehouse/create")}
-            className="inline-flex items-center justify-center gap-2 rounded-lg bg-black px-5 py-2.5 text-sm font-medium text-white shadow-md hover:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2 transition-all duration-200 w-full sm:w-auto whitespace-nowrap"
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-black px-5 py-2.5 text-sm font-medium text-white hover:bg-gray-900 focus:outline-none focus:ring-2 focus:ring-black focus:ring-offset-2 w-full sm:w-auto"
           >
-            <span>+</span> Add Warehouse
+            <Plus size={16} /> Add Warehouse
           </button>
         </div>
 
@@ -369,24 +311,18 @@ export default function Warehouse() {
           </div>
         )}
 
-        {/* Table */}
-        <div className="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
-          <div className="overflow-x-auto max-w-full">
-            <table className="w-full min-w-[600px] divide-y divide-gray-200">
+        {/* Main Table */}
+        <div className="overflow-hidden rounded-lg border border-gray-200 shadow-sm">
+          <div className="w-full table-fixed">
+            <table className="w-full  divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-3 sm:px-4 py-3 text-left text-xs font-semibold text-gray-600">
-                    #
-                  </th>
-                  <th className="px-3 sm:px-4 py-3 text-left text-xs font-semibold text-gray-600">
-                    Name
-                  </th>
+                  <th className="px-2 py-3 text-left text-xs font-semibold text-gray-600">#</th>
+                  <th className="px-2 py-3 text-left text-xs font-semibold text-gray-600">Name</th>
                   <th className="hidden md:table-cell px-4 py-3 text-left text-xs font-semibold text-gray-600">
                     Address
                   </th>
-                  <th className="px-3 sm:px-4 py-3 text-left text-xs font-semibold text-gray-600">
-                    City
-                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">City</th>
                   <th className="hidden sm:table-cell px-4 py-3 text-left text-xs font-semibold text-gray-600">
                     State
                   </th>
@@ -396,69 +332,41 @@ export default function Warehouse() {
                   <th className="hidden lg:table-cell px-4 py-3 text-left text-xs font-semibold text-gray-600">
                     Phone
                   </th>
-                  <th className="px-3 sm:px-4 py-3 text-left text-xs font-semibold text-gray-600">
-                    Status
-                  </th>
-                  <th className="px-3 sm:px-4 py-3 text-right text-xs font-semibold text-gray-600">
-                    Actions
-                  </th>
+                  <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">Status</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100 bg-white">
+              <tbody className="divide-y divide-gray-100">
                 {loading ? (
                   <tr>
-                    <td
-                      colSpan={9}
-                      className="px-4 py-12 text-center text-gray-500 text-sm"
-                    >
+                    <td colSpan={9} className="py-12 text-center text-gray-500">
                       Loading warehouses...
                     </td>
                   </tr>
                 ) : filteredWarehouses.length === 0 ? (
                   <tr>
-                    <td
-                      colSpan={9}
-                      className="px-4 py-12 text-center text-gray-500 text-sm"
-                    >
+                    <td colSpan={9} className="py-12 text-center text-gray-500">
                       No warehouses found
                     </td>
                   </tr>
                 ) : (
                   filteredWarehouses.map((wh, idx) => (
-                    <tr
-                      key={wh.id}
-                      className="group hover:bg-gray-50/70 transition-colors"
-                    >
-                      <td className="px-3 sm:px-4 py-3 text-xs text-gray-500">
+                    <tr key={wh.id} className="hover:bg-gray-50/60 transition-colors">
+                      <td className="px-4 py-3 text-sm text-gray-500">
                         {(currentPage - 1) * limit + idx + 1}
                       </td>
-                      <td className="px-3 sm:px-4 py-3 text-xs font-medium text-black">
-                        <div className="max-w-[120px] sm:max-w-[200px] truncate">
-                          {wh.name}
-                        </div>
+                      <td className="px-4 py-3 text-sm font-medium">{wh.name}</td>
+                      <td className="hidden md:table-cell px-4 py-3 text-sm text-gray-600 truncate max-w-xs">
+                        {wh.address}
                       </td>
-                      <td className="hidden md:table-cell px-4 py-3 text-xs text-gray-600 max-w-[200px] truncate">
-                        {wh.address || "—"}
-                      </td>
-                      <td className="px-3 sm:px-4 py-3 text-xs text-gray-700 max-w-[100px] sm:max-w-none truncate">
-                        {wh.city || "—"}
-                      </td>
-                      <td className="hidden sm:table-cell px-4 py-3 text-xs text-gray-700 max-w-[100px] sm:max-w-none truncate">
-                        {wh.state || "—"}
-                      </td>
-                      <td className="hidden lg:table-cell px-4 py-3 text-xs text-gray-600">
-                        {wh.pincode || "—"}
-                      </td>
-                      <td className="hidden lg:table-cell px-4 py-3 text-xs text-gray-600">
-                        {wh.phone || "—"}
-                      </td>
-                      <td className="px-3 sm:px-4 py-3">
+                      <td className="px-4 py-3 text-sm">{wh.city}</td>
+                      <td className="hidden sm:table-cell px-4 py-3 text-sm">{wh.state}</td>
+                      <td className="hidden lg:table-cell px-4 py-3 text-sm">{wh.pincode}</td>
+                      <td className="hidden lg:table-cell px-4 py-3 text-sm">{wh.phone}</td>
+                      <td className="px-4 py-3">
                         <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleToggleActive(wh);
-                          }}
-                          className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium transition-colors whitespace-nowrap ${
+                          onClick={() => handleToggleActive(wh)}
+                          className={`px-3 py-1 rounded-full text-xs font-medium ${
                             wh.isActive
                               ? "bg-green-100 text-green-800 hover:bg-green-200"
                               : "bg-red-100 text-red-800 hover:bg-red-200"
@@ -467,45 +375,29 @@ export default function Warehouse() {
                           {wh.isActive ? "Active" : "Inactive"}
                         </button>
                       </td>
-                      <td className="px-3 sm:px-4 py-3 text-right text-xs">
-                        <div className="flex items-center justify-end gap-2 flex-wrap">
+                      <td className="px-4 py-3 text-right text-sm">
+                        <div className="flex items-center justify-end gap-3 flex-wrap">
                           <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleManagePincodes(wh);
-                            }}
-                            className="font-medium text-blue-600 hover:text-blue-800 transition-colors whitespace-nowrap flex items-center gap-1"
-                            title="Manage Pincodes"
+                            onClick={() => handleManagePincodes(wh)}
+                            className="text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1"
                           >
-                            <MapPin size={14} />
-                            Pincodes
+                            <MapPin size={14} /> Pincodes
                           </button>
                           <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleManageStock(wh);
-                            }}
-                            className="font-medium text-purple-600 hover:text-purple-800 transition-colors whitespace-nowrap flex items-center gap-1"
-                            title="Manage Stock"
+                            onClick={() => handleManageStock(wh)}
+                            className="text-purple-600 hover:text-purple-800 font-medium flex items-center gap-1"
                           >
-                            <Package size={14} />
-                            Stock
+                            <Package size={14} /> Stock
                           </button>
                           <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleEdit(wh);
-                            }}
-                            className="font-medium text-black hover:text-gray-700 transition-colors whitespace-nowrap"
+                            onClick={() => handleEdit(wh)}
+                            className="text-gray-700 hover:text-black font-medium"
                           >
                             Edit
                           </button>
                           <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDelete(wh.id);
-                            }}
-                            className="font-medium text-red-600 hover:text-red-800 transition-colors whitespace-nowrap"
+                            onClick={() => handleDelete(wh.id)}
+                            className="text-red-600 hover:text-red-800 font-medium"
                           >
                             Delete
                           </button>
@@ -519,31 +411,28 @@ export default function Warehouse() {
           </div>
         </div>
 
-        {/* Pagination */}
+        {/* Main Pagination */}
         {warehouses.length > 0 && (
-          <div className="mt-6 flex flex-col sm:flex-row justify-between items-center gap-4 px-1">
-            <div className="text-sm text-gray-700 font-medium">
-              Showing <span className="font-bold">{warehouses.length}</span> of{" "}
-              <span className="font-bold">{totalPages * limit}</span> warehouses
+          <div className="mt-6 flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div className="text-sm text-gray-600">
+              Showing <strong>{filteredWarehouses.length}</strong> of{" "}
+              <strong>{totalPages * limit}</strong> warehouses
             </div>
-
             <div className="flex items-center gap-3">
               <button
-                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                 disabled={currentPage === 1 || loading}
-                className="px-5 py-2.5 bg-white border-2 border-gray-300 rounded-lg font-semibold text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 hover:border-gray-400 transition-all shadow-sm"
+                className="px-4 py-2 border rounded disabled:opacity-50 hover:bg-gray-50"
               >
                 Previous
               </button>
-              <span className="px-5 py-2.5 bg-gray-50 border border-gray-200 rounded-lg font-semibold text-gray-700 min-w-[140px] text-center">
-                Page {currentPage} of {totalPages || 1}
+              <span className="px-5 py-2 bg-gray-100 rounded font-medium">
+                Page {currentPage} of {totalPages}
               </span>
               <button
-                onClick={() =>
-                  setCurrentPage((prev) => Math.min(totalPages, prev + 1))
-                }
+                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                 disabled={currentPage >= totalPages || loading}
-                className="px-5 py-2.5 bg-white border-2 border-gray-300 rounded-lg font-semibold text-gray-700 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 hover:border-gray-400 transition-all shadow-sm"
+                className="px-4 py-2 border rounded disabled:opacity-50 hover:bg-gray-50"
               >
                 Next
               </button>
@@ -552,135 +441,165 @@ export default function Warehouse() {
         )}
       </div>
 
-      {/* Pincode Management Modal */}
+      {/* ────────────────────────────────────────────────
+           PINCODE MODAL
+      ──────────────────────────────────────────────── */}
       {showPincodeModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-              <h2 className="text-xl font-bold text-black">
-                Manage Pincodes - {selectedWarehouse?.name}
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b px-6 py-4 flex items-center justify-between z-10">
+              <h2 className="text-xl font-bold">
+                Manage Pincodes — {selectedWarehouse?.name}
               </h2>
               <button
                 onClick={() => {
-                  console.log("🟡 Closing pincode modal");
-                  console.log("🟡 Current pincodes state:", pincodes);
                   setShowPincodeModal(false);
                   setSelectedWarehouse(null);
                   setPincodes([]);
                   setNewPincode("");
-                  console.log("🟡 Modal closed, state cleared");
+                  setPincodeSearch("");
+                  setPincodePage(1);
                 }}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                className="p-2 hover:bg-gray-100 rounded-full"
               >
-                <X size={20} />
+                <X size={24} />
               </button>
             </div>
 
-            <div className="p-6 space-y-4">
-              {/* Add Pincode */}
-              <div className="flex gap-2">
+            <div className="p-6 space-y-6">
+              {/* Add new pincode */}
+              <div className="flex gap-3">
                 <input
                   type="text"
                   value={newPincode}
-                  onChange={(e) => {
-                    console.log("🟢 Pincode input changed:", e.target.value);
-                    setNewPincode(e.target.value);
-                  }}
-                  placeholder="Enter pincode (e.g., 400001)"
-                  className="flex-1 px-3.5 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
-                  onKeyPress={(e) => {
-                    console.log("🟢 Enter key pressed in pincode input");
-                    if (e.key === "Enter") {
-                      console.log("🟢 Calling handleAddPincode from Enter key");
-                      handleAddPincode();
-                    }
-                  }}
+                  onChange={(e) => setNewPincode(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), handleAddPincode())}
+                  placeholder="Enter 6-digit pincode (e.g. 560001)"
+                  className="flex-1 px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-black focus:border-transparent"
                 />
                 <button
-                  onClick={() => {
-                    console.log("🟢 Add button clicked");
-                    console.log("🟢 Current newPincode state:", newPincode);
-                    handleAddPincode();
-                  }}
-                  className="px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors flex items-center gap-2 text-sm font-medium"
+                  onClick={handleAddPincode}
+                  className="px-5 py-2.5 bg-black text-white rounded-lg hover:bg-gray-900 flex items-center gap-2 whitespace-nowrap"
                 >
-                  <Plus size={16} />
-                  Add
+                  <Plus size={16} /> Add
                 </button>
               </div>
 
-              {/* Pincodes List */}
-              {(() => {
-                console.log("🟣 Rendering pincodes list");
-                console.log("🟣 pincodeLoading:", pincodeLoading);
-                console.log("🟣 pincodes:", pincodes);
-                console.log("🟣 pincodes.length:", pincodes.length);
-                return null;
-              })()}
-              {pincodeLoading ? (
-                <div className="text-center py-8 text-gray-500">Loading pincodes...</div>
-              ) : pincodes.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">No pincodes added yet</div>
-              ) : (
-                <div className="border border-gray-200 rounded-lg overflow-hidden">
-                  <div className="max-h-96 overflow-y-auto">
-                    <table className="w-full">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">
-                            Pincode
-                          </th>
-                          <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600">
-                            Actions
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100">
-                        {pincodes.map((pin, idx) => {
-                          // Extract pincode value from nested structure
-                          console.log(`🟡 Rendering pincode ${idx}:`, pin);
-                          const pincodeValue = pin.pincodeId?.pinCode || pin.pincode || pin.pinCode || (typeof pin === 'string' ? pin : '—');
-                          const pincodeId = pin._id || pin.id;
-                          console.log(`🟡 Extracted pincodeValue:`, pincodeValue);
-                          console.log(`🟡 Extracted pincodeId:`, pincodeId);
-                          
-                          return (
-                            <tr key={pincodeId || idx} className="hover:bg-gray-50">
-                              <td className="px-4 py-3 text-sm text-gray-900 font-medium">
-                                {pincodeValue}
-                              </td>
-                              <td className="px-4 py-3 text-right">
-                                <button
-                                  onClick={() => {
-                                    console.log("🟡 Delete button clicked for pincode:", pin);
-                                    console.log("🟡 pincodeId to pass:", pincodeId);
-                                    handleDeletePincode(pincodeId);
-                                  }}
-                                  className="text-red-600 hover:text-red-800 text-sm font-medium transition-colors"
-                                >
-                                  Remove
-                                </button>
-                              </td>
+              {/* Search + List + Pagination */}
+              <div className="space-y-4">
+                <input
+                  type="text"
+                  placeholder="Filter pincodes..."
+                  value={pincodeSearch}
+                  onChange={(e) => {
+                    setPincodeSearch(e.target.value);
+                    setPincodePage(1);
+                  }}
+                  className="w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-black focus:border-transparent"
+                />
+
+                {pincodeLoading ? (
+                  <div className="text-center py-10 text-gray-500">Loading pincodes...</div>
+                ) : pincodes.length === 0 ? (
+                  <div className="text-center py-10 text-gray-500">No pincodes added yet</div>
+                ) : filteredPincodes.length === 0 ? (
+                  <div className="text-center py-10 text-gray-500">No matching pincodes</div>
+                ) : (
+                  <>
+                    <div className="border rounded-lg overflow-hidden">
+                      <div className="max-h-80 overflow-y-auto">
+                        <table className="w-full">
+                          <thead className="bg-gray-50 sticky top-0">
+                            <tr>
+                              <th className="px-5 py-3 text-left text-xs font-semibold text-gray-700">
+                                Pincode
+                              </th>
+                              <th className="px-5 py-3 text-right text-xs font-semibold text-gray-700 w-28">
+                                Action
+                              </th>
                             </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
+                          </thead>
+                          <tbody className="divide-y">
+                            {paginatedPincodes.map((pin, i) => {
+                              const value =
+                                pin?.pincodeId?.pinCode ||
+                                pin?.pinCode ||
+                                pin?.pincode ||
+                                (typeof pin === "string" ? pin : "—");
+                              const id = pin._id || pin.id;
+                              return (
+                                <tr key={id || i} className="hover:bg-gray-50">
+                                  <td className="px-5 py-3.5 font-medium">{value}</td>
+                                  <td className="px-5 py-3.5 text-right">
+                                    <button
+                                      onClick={() => handleDeletePincode(id)}
+                                      className="text-red-600 hover:text-red-800 font-medium"
+                                    >
+                                      Remove
+                                    </button>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    {filteredPincodes.length > PINCODE_LIMIT && (
+                      <div className="flex flex-col sm:flex-row justify-between items-center gap-4 text-sm text-gray-600">
+                        <div>
+                          Showing {(pincodePage - 1) * PINCODE_LIMIT + 1} –{" "}
+                          {Math.min(pincodePage * PINCODE_LIMIT, filteredPincodes.length)} of{" "}
+                          {filteredPincodes.length}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setPincodePage((p) => Math.max(1, p - 1))}
+                            disabled={pincodePage === 1}
+                            className="px-4 py-1.5 border rounded disabled:opacity-40 hover:bg-gray-50"
+                          >
+                            Prev
+                          </button>
+                          <span className="px-4 py-1.5 font-medium bg-gray-100 rounded">
+                            Page {pincodePage} of {Math.ceil(filteredPincodes.length / PINCODE_LIMIT)}
+                          </span>
+                          <button
+                            onClick={() =>
+                              setPincodePage((p) =>
+                                Math.min(
+                                  Math.ceil(filteredPincodes.length / PINCODE_LIMIT),
+                                  p + 1
+                                )
+                              )
+                            }
+                            disabled={
+                              pincodePage >= Math.ceil(filteredPincodes.length / PINCODE_LIMIT)
+                            }
+                            className="px-4 py-1.5 border rounded disabled:opacity-40 hover:bg-gray-50"
+                          >
+                            Next
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Stock Management Modal */}
+      {/* ────────────────────────────────────────────────
+           STOCK MODAL
+      ──────────────────────────────────────────────── */}
       {showStockModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-              <h2 className="text-xl font-bold text-black">
-                Manage Stock - {selectedWarehouse?.name}
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b px-6 py-4 flex items-center justify-between z-10">
+              <h2 className="text-xl font-bold">
+                Manage Stock — {selectedWarehouse?.name}
               </h2>
               <button
                 onClick={() => {
@@ -688,88 +607,135 @@ export default function Warehouse() {
                   setSelectedWarehouse(null);
                   setStock([]);
                   setStockForm({ sku: "", quantity: "" });
+                  setStockSearch("");
+                  setStockPage(1);
                 }}
-                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                className="p-2 hover:bg-gray-100 rounded-full"
               >
-                <X size={20} />
+                <X size={24} />
               </button>
             </div>
 
-            <div className="p-6 space-y-4">
-              {/* Add/Update Stock */}
-              <div className="bg-gray-50 p-4 rounded-lg space-y-3">
-                <h3 className="text-sm font-semibold text-gray-700">Add / Update Stock</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div className="p-6 space-y-6">
+              {/* Add / Update stock form */}
+              <div className="bg-gray-50 p-5 rounded-xl space-y-4">
+                <h3 className="font-semibold text-gray-700">Update Stock</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                   <input
                     type="text"
                     value={stockForm.sku}
-                    onChange={(e) =>
-                      setStockForm({ ...stockForm, sku: e.target.value })
-                    }
-                    placeholder="Enter SKU (e.g., SKU-0-S)"
-                    className="px-3.5 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+                    onChange={(e) => setStockForm({ ...stockForm, sku: e.target.value })}
+                    placeholder="SKU (e.g. PROD-RED-XL)"
+                    className="px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-black focus:border-transparent"
                   />
                   <input
                     type="number"
                     value={stockForm.quantity}
-                    onChange={(e) =>
-                      setStockForm({ ...stockForm, quantity: e.target.value })
-                    }
-                    placeholder="Enter quantity"
+                    onChange={(e) => setStockForm({ ...stockForm, quantity: e.target.value })}
+                    placeholder="Quantity"
                     min="0"
-                    className="px-3.5 py-2 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent"
+                    className="px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-black focus:border-transparent"
                   />
                   <button
                     onClick={handleUpdateStock}
-                    className="px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors flex items-center justify-center gap-2 text-sm font-medium"
+                    className="px-5 py-2.5 bg-black text-white rounded-lg hover:bg-gray-900 flex items-center justify-center gap-2 whitespace-nowrap"
                   >
-                    <Plus size={16} />
-                    Update Stock
+                    <Plus size={16} /> Update
                   </button>
                 </div>
               </div>
 
-              {/* Stock List */}
-              {stockLoading ? (
-                <div className="text-center py-8 text-gray-500">Loading stock...</div>
-              ) : stock.length === 0 ? (
-                <div className="text-center py-8 text-gray-500">No stock items found</div>
-              ) : (
-                <div className="border border-gray-200 rounded-lg overflow-hidden">
-                  <div className="max-h-96 overflow-y-auto">
-                    <table className="w-full">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">
-                            SKU
-                          </th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">
-                            Product Name
-                          </th>
-                          <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600">
-                            Quantity
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-100">
-                        {stock.map((item, idx) => (
-                          <tr key={item._id || item.id || idx} className="hover:bg-gray-50">
-                            <td className="px-4 py-3 text-sm text-gray-900 font-medium">
-                              {item.sku || item.SKU || "—"}
-                            </td>
-                            <td className="px-4 py-3 text-sm text-gray-600">
-                              {item.productName || item.name || "—"}
-                            </td>
-                            <td className="px-4 py-3 text-sm text-gray-900 font-semibold text-right">
-                              {item.quantity || item.stock || 0}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              )}
+              {/* Stock list + search + pagination */}
+              <div className="space-y-4">
+                <input
+                  type="text"
+                  placeholder="Search by SKU or product name..."
+                  value={stockSearch}
+                  onChange={(e) => {
+                    setStockSearch(e.target.value);
+                    setStockPage(1);
+                  }}
+                  className="w-full px-4 py-2.5 border rounded-lg focus:ring-2 focus:ring-black focus:border-transparent"
+                />
+
+                {stockLoading ? (
+                  <div className="text-center py-10 text-gray-500">Loading stock...</div>
+                ) : stock.length === 0 ? (
+                  <div className="text-center py-10 text-gray-500">No stock items found</div>
+                ) : filteredStock.length === 0 ? (
+                  <div className="text-center py-10 text-gray-500">No matching items</div>
+                ) : (
+                  <>
+                    <div className="border rounded-lg overflow-hidden">
+                      <div className="max-h-80 overflow-y-auto">
+                        <table className="w-full">
+                          <thead className="bg-gray-50 sticky top-0">
+                            <tr>
+                              <th className="px-5 py-3 text-left text-xs font-semibold text-gray-700">
+                                SKU
+                              </th>
+                              <th className="px-5 py-3 text-left text-xs font-semibold text-gray-700">
+                                Product
+                              </th>
+                              <th className="px-5 py-3 text-right text-xs font-semibold text-gray-700 w-32">
+                                Quantity
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y">
+                            {paginatedStock.map((item, i) => (
+                              <tr key={item._id || item.id || i} className="hover:bg-gray-50">
+                                <td className="px-5 py-3.5 font-medium">
+                                  {item.sku || item.SKU || "—"}
+                                </td>
+                                <td className="px-5 py-3.5 text-gray-600">
+                                  {item.productName || item.name || "—"}
+                                </td>
+                                <td className="px-5 py-3.5 text-right font-semibold">
+                                  {item.quantity ?? 0}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    {filteredStock.length > STOCK_LIMIT && (
+                      <div className="flex flex-col sm:flex-row justify-between items-center gap-4 text-sm text-gray-600">
+                        <div>
+                          Showing {(stockPage - 1) * STOCK_LIMIT + 1} –{" "}
+                          {Math.min(stockPage * STOCK_LIMIT, filteredStock.length)} of{" "}
+                          {filteredStock.length}
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setStockPage((p) => Math.max(1, p - 1))}
+                            disabled={stockPage === 1}
+                            className="px-4 py-1.5 border rounded disabled:opacity-40 hover:bg-gray-50"
+                          >
+                            Prev
+                          </button>
+                          <span className="px-4 py-1.5 font-medium bg-gray-100 rounded">
+                            Page {stockPage} of {Math.ceil(filteredStock.length / STOCK_LIMIT)}
+                          </span>
+                          <button
+                            onClick={() =>
+                              setStockPage((p) =>
+                                Math.min(Math.ceil(filteredStock.length / STOCK_LIMIT), p + 1)
+                              )
+                            }
+                            disabled={stockPage >= Math.ceil(filteredStock.length / STOCK_LIMIT)}
+                            className="px-4 py-1.5 border rounded disabled:opacity-40 hover:bg-gray-50"
+                          >
+                            Next
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </div>

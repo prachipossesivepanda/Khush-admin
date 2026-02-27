@@ -1,6 +1,5 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import ProtectedRoute from "../utils/ProtectedRoute";
-
 import Login from "../admin/components/Auth/Login";
 import OTP from "../admin/components/Auth/Otp";
 import Layout from "../admin/components/common components/Layout";
@@ -45,6 +44,11 @@ import InfluencerCoupons from "../admin/components/influencer/influencercoupon";
 import InfluencerCouponsForm from "../admin/components/influencer/influencercouponform";
 import CouponAnalytics from "../admin/components/coupon/CouponAnayltics";
 import InfluencerCouponManage from "../admin/components/influencer/influencercouponmanagement";
+import ExchangeForm from "../admin/components/exchange/exchnagePolicyform";
+import Exchanges from "../admin/components/exchange/exchangePolicy";
+import Status from "../admin/components/Status/Status";
+import StatusPage from "../admin/components/Status/Statusform";
+import Orders from "../admin/components/orders/order";
 const AdminRoutes = () => {
   return (
     <Routes>
@@ -112,10 +116,14 @@ const AdminRoutes = () => {
         <Route path="banner-form/:id" element={<SplashForm />} />
 
         <Route path="delivery" element={<Delivery />} />
-
+         <Route path="orders" element={<Orders/>}/>
         <Route path="subadmin" element={<SubAdmin />} />
         <Route path="subadmin/create" element={<SubAdminForm />} />
         <Route path="subadmin/edit/:id" element={<SubAdminForm />} />
+
+        <Route path="status" element={<Status/>}/>
+        <Route path="status/create" element={<StatusPage/>}/>
+        <Route path="status/edit/:id" element={<StatusPage/>}/>
 
         <Route path="influencer" element={<Influencer />} />
         <Route path="influencer/create" element={<InfluencerForm />} />
@@ -124,6 +132,9 @@ const AdminRoutes = () => {
         <Route path="driver" element={<Deliveryagent />} />
         <Route path="driver/create" element={<DeliveryAgentForm />} />
         <Route path="driver/edit/:id" element={<DeliveryAgentForm />} />
+        <Route path="exchange" element={<Exchanges/>}/>
+        <Route path="exchange/create" element={<ExchangeForm/>}/>
+        <Route path="exchange/edit/:id" element={<ExchangeForm/>}/>
 
         <Route path="warehouse" element={<Warehouse />} />
         <Route path="warehouse/create" element={<WarehouseForm />} />

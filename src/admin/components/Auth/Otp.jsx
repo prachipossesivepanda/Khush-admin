@@ -1,21 +1,24 @@
 // OTP.jsx
-import { useState, useRef, useEffect } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { useDispatch, useSelector } from 'react-redux';
+import { useState, useRef, useEffect } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
 import { jwtDecode } from "jwt-decode";
-import { verifyOtp } from '../../apis/Authapi';
+import { verifyOtp, resendOtp } from "../../apis/Authapi";
 import {
   setLoading,
   setError,
   clearError,
-  setToken
-} from '../../../redux/GlobalSlice';
-import { selectLoading, selectError } from '../../../redux/GlobalSelector';
+  setToken,
+} from "../../../redux/GlobalSlice";
+import { selectLoading, selectError } from "../../../redux/GlobalSelector";
 
 export default function OTP() {
-  const [otp, setOtp] = useState(['', '', '', '', '', '']);
+  const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [isValid, setIsValid] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [resendTimer, setResendTimer] = useState(30);
+  const [canResend, setCanResend] = useState(false);
+
   const inputs = useRef([]);
   const navigate = useNavigate();
   const location = useLocation();
@@ -24,17 +27,43 @@ export default function OTP() {
   const loading = useSelector(selectLoading);
   const error = useSelector(selectError);
 
-  const phone = location.state?.phone || 'XXXXXXXXXX';
+  const phone = location.state?.phone || "XXXXXXXXXX";
   const userId = location.state?.userId || null;
 
+  // Auto-focus first input on mount
   useEffect(() => {
-    console.log("OTP component mounted");
     inputs.current[0]?.focus();
   }, []);
 
-  const handleChange = (index, value) => {
-    console.log(`Input ${index} changed to:`, value);
+  // Resend OTP countdown timer
+  useEffect(() => {
+    if (canResend || resendTimer <= 0) {
+      setCanResend(true);
+      return;
+    }
 
+    console.log("[TIMER] Starting countdown from:", resendTimer);
+
+    const interval = setInterval(() => {
+      setResendTimer((prev) => {
+        const next = prev - 1;
+        console.log("[TIMER] Tick:", next);
+
+        if (next <= 0) {
+          setCanResend(true);
+          return 0;
+        }
+        return next;
+      });
+    }, 1000);
+
+    return () => {
+      console.log("[TIMER] Cleaning up interval");
+      clearInterval(interval);
+    };
+  }, [canResend]); // Important: depend mainly on canResend
+
+  const handleChange = (index, value) => {
     if (!/^\d*$/.test(value)) return;
 
     const newOtp = [...otp];
@@ -49,15 +78,14 @@ export default function OTP() {
   };
 
   const handleKeyDown = (index, e) => {
-    if (e.key === 'Backspace' && !otp[index] && index > 0) {
+    if (e.key === "Backspace" && !otp[index] && index > 0) {
       inputs.current[index - 1]?.focus();
     }
   };
 
   const handlePaste = (e) => {
     e.preventDefault();
-    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6);
-    console.log("Pasted OTP:", pasted);
+    const pasted = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
 
     if (pasted.length > 0) {
       const newOtp = [...otp];
@@ -73,92 +101,102 @@ export default function OTP() {
     }
   };
 
- const handleSubmit = async (e) => {
-  e.preventDefault();
-  const otpValue = otp.join('');
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const otpValue = otp.join("");
 
-  if (otpValue.length !== 6) {
-    setIsValid(false);
-    return;
-  }
-
-  dispatch(clearError());
-  dispatch(setLoading(true));
-  setIsValid(true);
-  setIsSubmitting(true);
-
-  try {
-    const res = await verifyOtp({ userId, otp: otpValue });
-
-    if (res.success) {
-
-      const accessToken = res.data.accessToken;
-      const refreshToken = res.data.refereshToken;
-
-      // ✅ Store in Redux
-      dispatch(setToken({ accessToken, refreshToken }));
-
-      // ✅ Store in localStorage
-      localStorage.setItem('token', accessToken);
-      localStorage.setItem('refreshToken', refreshToken);
-
-      // ✅ Decode JWT to get role
-      const decoded = jwtDecode(accessToken);
-      console.log("Decoded Token:", decoded);
-
-      const role = decoded?.role?.toUpperCase();
-
-      if (!role) {
-        throw new Error("Role not found in token");
-      }
-
-      // ✅ Store role
-      localStorage.setItem('userRole', role);
-
-      console.log("Stored role:", role);
-
-      // ✅ Dynamic Redirect Based on Role
-      switch (role) {
-        case "ADMIN":
-        case "SUBADMIN":
-          navigate('/admin/dashboard', { replace: true });
-          break;
-
-        case "INFLUENCER":
-          navigate('/influencer/dashboard', { replace: true });
-          break;
-
-        case "DRIVER":
-          navigate('/driver/dashboard', { replace: true });
-          break;
-
-        default:
-          navigate('/login', { replace: true });
-      }
-
-    } else {
+    if (otpValue.length !== 6) {
       setIsValid(false);
-      dispatch(setError(res.message));
+      return;
     }
 
-  } catch (err) {
-    console.error("Error verifying OTP:", err);
-    setIsValid(false);
-    dispatch(setError(err.message || "Verification failed"));
-  } finally {
-    dispatch(setLoading(false));
-    setIsSubmitting(false);
-  }
-};
-
-  const handleResend = () => {
-    setOtp(['', '', '', '', '', '']);
+    dispatch(clearError());
+    dispatch(setLoading(true));
     setIsValid(true);
-    inputs.current[0]?.focus();
-    console.log("Resend OTP triggered");
+    setIsSubmitting(true);
 
-    // Call resend OTP API if available
-    alert('Resend OTP API not integrated (demo)');
+    try {
+      const res = await verifyOtp({ userId, otp: otpValue });
+
+      if (res.success) {
+        const accessToken = res.data.accessToken;
+        const refreshToken = res.data.refreshToken; // note: typo fix → referesh → refresh
+
+        dispatch(setToken({ accessToken, refreshToken }));
+
+        localStorage.setItem("token", accessToken);
+        localStorage.setItem("refreshToken", refreshToken);
+
+        const decoded = jwtDecode(accessToken);
+        const role = decoded?.role?.toUpperCase();
+
+        if (!role) throw new Error("Role not found in token");
+
+        localStorage.setItem("userRole", role);
+
+        // Role-based navigation
+        switch (role) {
+          case "ADMIN":
+          case "SUBADMIN":
+            navigate("/admin/dashboard", { replace: true });
+            break;
+          case "INFLUENCER":
+            navigate("/influencer/dashboard", { replace: true });
+            break;
+          case "DRIVER":
+            navigate("/driver/dashboard", { replace: true });
+            break;
+          default:
+            navigate("/login", { replace: true });
+        }
+      } else {
+        setIsValid(false);
+        dispatch(setError(res.message || "Invalid OTP"));
+      }
+    } catch (err) {
+      console.error("OTP verification failed:", err);
+      setIsValid(false);
+      dispatch(setError(err.message || "Verification failed"));
+    } finally {
+      dispatch(setLoading(false));
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleResend = async () => {
+    if (!canResend) return;
+    if (!userId) {
+      dispatch(setError("User ID is missing"));
+      return;
+    }
+
+    try {
+      dispatch(clearError());
+      dispatch(setLoading(true));
+
+      const res = await resendOtp({ userId });
+
+      if (res.success) {
+        console.log("[RESEND] Success → resetting UI state");
+
+        // Reset OTP inputs
+        setOtp(["", "", "", "", "", ""]);
+        inputs.current[0]?.focus();
+
+        // Restart timer — this will trigger the useEffect
+        setResendTimer(30);
+        setCanResend(false);
+
+        console.log("[RESEND] Timer reset to 30s, canResend = false");
+      } else {
+        dispatch(setError(res.message || "Failed to resend OTP"));
+      }
+    } catch (err) {
+      console.error("[RESEND] Error:", err);
+      dispatch(setError(err.message || "Failed to resend OTP"));
+    } finally {
+      dispatch(setLoading(false));
+    }
   };
 
   return (
@@ -169,7 +207,9 @@ export default function OTP() {
 
           <div className="p-8 sm:p-10">
             <div className="text-center mb-9">
-              <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Verify Phone</h1>
+              <h1 className="text-3xl font-bold text-gray-900 tracking-tight">
+                Verify Phone
+              </h1>
               <p className="mt-3 text-gray-600">Enter the 6-digit code sent to</p>
               <p className="mt-1 font-medium text-gray-900">+91 {phone}</p>
             </div>
@@ -189,21 +229,29 @@ export default function OTP() {
                     className={`
                       w-12 h-14 sm:w-14 sm:h-16
                       text-center text-2xl font-bold
-                      bg-white border ${isValid ? 'border-gray-300 focus:border-black' : 'border-red-500 focus:border-red-600'}
+                      bg-white border ${
+                        isValid
+                          ? "border-gray-300 focus:border-black"
+                          : "border-red-500 focus:border-red-600"
+                      }
                       rounded-lg
                       focus:ring-2 focus:ring-black/20 focus:outline-none
                       transition-all duration-200
                     `}
-                    disabled={loading}
+                    disabled={loading || isSubmitting}
                   />
                 ))}
               </div>
 
-              {!isValid && <p className="text-center text-sm text-red-600">{error || 'Please enter a valid 6-digit code'}</p>}
+              {!isValid && (
+                <p className="text-center text-sm text-red-600">
+                  {error || "Please enter a valid 6-digit code"}
+                </p>
+              )}
 
               <button
                 type="submit"
-                disabled={isSubmitting || otp.join('').length !== 6 || loading}
+                disabled={isSubmitting || otp.join("").length !== 6 || loading}
                 className={`
                   w-full py-4 px-6
                   bg-black text-white
@@ -216,23 +264,28 @@ export default function OTP() {
                   disabled:opacity-50 disabled:hover:scale-100 disabled:cursor-not-allowed
                 `}
               >
-                {loading ? 'Verifying...' : 'Verify & Continue'}
+                {loading ? "Verifying..." : "Verify & Continue"}
               </button>
             </form>
 
             <div className="mt-8 text-center">
               <p className="text-sm text-gray-600">
-                Didn't receive the code?{' '}
+                Didn't receive the code?{" "}
                 <button
                   type="button"
                   onClick={handleResend}
-                  className="text-black font-medium hover:text-gray-700 transition-colors"
-                  disabled={loading}
+                  disabled={!canResend || loading}
+                  className={`
+                    text-black font-medium transition-colors
+                    ${!canResend ? "opacity-50 cursor-not-allowed" : "hover:text-gray-700"}
+                  `}
                 >
-                  Resend OTP
+                  {canResend ? "Resend OTP" : `Resend in ${resendTimer}s`}
                 </button>
               </p>
-              <p className="mt-2 text-xs text-gray-500">Code expires in 5 minutes</p>
+              <p className="mt-2 text-xs text-gray-500">
+                Code expires in 5 minutes
+              </p>
             </div>
           </div>
         </div>

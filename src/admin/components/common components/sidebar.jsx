@@ -201,7 +201,7 @@ const Sidebar = () => {
                   >
                     SubCategories
                   </Link> */}
-                <Link
+                  <Link
                     to="/admin/items"
                     className={`block px-4 py-2.5 text-gray-400 hover:bg-white hover:text-black transition-all duration-200 text-sm font-medium ${
                       location.pathname.includes("/admin/items")
@@ -211,7 +211,6 @@ const Sidebar = () => {
                   >
                     Stock management
                   </Link>
-
                 </div>
               </div>
             </div>
@@ -274,6 +273,18 @@ const Sidebar = () => {
               />
               <span>Sections</span>
             </Link>
+            <Link
+              to="/admin/exchange"
+              className={`flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-white hover:text-black transition-all duration-200 font-medium group ${
+                isActive("/admin/exchange") ? "bg-white/10 text-white" : ""
+              }`}
+            >
+              <ShoppingCart
+                size={20}
+                className="text-gray-400 group-hover:text-black"
+              />
+              <span>Exchange</span>
+            </Link>
 
             <Link
               to="/admin/banners"
@@ -312,6 +323,36 @@ const Sidebar = () => {
                 className="text-gray-400 group-hover:text-black"
               />
               <span>Features</span>
+            </Link>
+
+             <Link
+              to="/admin/orders"
+              className={`flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-white hover:text-black transition-all duration-200 font-medium group ${
+                isActive("/admin/orders") ? "bg-white/10 text-white" : ""
+              }`}
+            >
+              <Package
+                size={20}
+                className="text-gray-400 group-hover:text-black"
+              />
+              <span>Orders</span>
+
+              
+            </Link>
+
+            <Link
+              to="/admin/status"
+              className={`flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-white hover:text-black transition-all duration-200 font-medium group ${
+                isActive("/admin/status") ? "bg-white/10 text-white" : ""
+              }`}
+            >
+              <Package
+                size={20}
+                className="text-gray-400 group-hover:text-black"
+              />
+              <span>Status</span>
+
+              
             </Link>
 
             <Link

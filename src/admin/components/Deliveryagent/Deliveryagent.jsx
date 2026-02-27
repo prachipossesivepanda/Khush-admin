@@ -1,238 +1,212 @@
-import React, { useEffect, useState } from "react";
-import {
-  getDeliveryAgents,
-  deleteDeliveryAgent,
-  toggleDeliveryAgentStatus,
-} from "../../apis/Driverapi";
-import { useNavigate } from "react-router-dom";
+// src/pages/admin/DeliveryAgents.jsx
+import React, { useState, useEffect } from 'react';
+import { 
+  getDeliveryAgents, 
+  deleteDeliveryAgent, 
+  toggleDeliveryAgentStatus 
+} from '../../apis/Driverapi'; // adjust path
+import { useNavigate } from 'react-router-dom';
+import { toast } from 'react-toastify'; // assuming you use react-toastify
+import { 
+  PencilIcon, 
+  TrashIcon, 
+  PlusIcon,
+  PowerIcon 
+} from '@heroicons/react/24/outline';
 
-const DeliveryAgent = () => {
+const DeliveryAgents = () => {
+  const [agents, setAgents] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [page, setPage] = useState(1);
+  const [limit] = useState(10);
+  const [totalPages, setTotalPages] = useState(1);
+  const [search, setSearch] = useState('');
+  const [activeFilter, setActiveFilter] = useState(true);
+
   const navigate = useNavigate();
 
-  const [agents, setAgents] = useState([]);
-  const [page, setPage] = useState(1);
-  const [search, setSearch] = useState("");
-  const [debouncedSearch, setDebouncedSearch] = useState("");
-  const [totalPages, setTotalPages] = useState(1);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+const fetchAgents = async () => {
+  setLoading(true);
+  try {
+    const response = await getDeliveryAgents(page, limit, search, activeFilter);
+    
+    // ─────────────── Debug prints ───────────────
+    console.log("Full response:", response);
+    console.log("response.data:", response?.data);
+    console.log("response.data.deliveryAgents:", response?.data?.deliveryAgents);
+    console.log("Number of agents:", response?.data?.deliveryAgents?.length ?? 0);
 
-  // Debounce search term to avoid too many API calls
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setDebouncedSearch(search);
-    }, 500); // Wait 500ms after user stops typing
+    setAgents(response?.data?.deliveryAgents || []);
+    setTotalPages(response?.data?.pagination?.totalPages || 1);
 
-    return () => clearTimeout(timer);
-  }, [search]);
-
-  // Reset to page 1 when search term changes
-  useEffect(() => {
-    if (debouncedSearch !== search) {
-      setPage(1);
-    }
-  }, [debouncedSearch]);
-
-  const fetchAgents = async () => {
-    setLoading(true);
-    setError(null);
-
-    console.log("→ Fetching delivery agents", { page, search: debouncedSearch, onlyActive: false });
-
-    try {
-      const res = await getDeliveryAgents(page, 10, debouncedSearch, false);
-
-      const data = res?.data;
-      console.log("← API response:", data);
-
-      if (data?.success === true || Array.isArray(data?.deliveryAgents)) {
-        // Handle both wrapped ({success, data}) and direct {deliveryAgents, pagination} formats
-        const agentsData = data.success ? data.data?.deliveryAgents : data.deliveryAgents;
-        const paginationData = data.success ? data.data?.pagination : data.pagination;
-
-        const fetchedAgents = Array.isArray(agentsData) ? agentsData : [];
-        const pagination = paginationData || {};
-
-        setAgents(fetchedAgents);
-        setTotalPages(pagination.totalPages || 1);
-
-        console.log(`Loaded ${fetchedAgents.length} agents`);
-
-        // Debug each agent's status
-        fetchedAgents.forEach((agent) => {
-          console.log(
-            `→ ${agent.name || "Unnamed"} (${agent.phoneNumber || agent._id}): ` +
-            `isActive = ${agent.isActive ?? "missing"}`
-          );
-        });
-
-        if (fetchedAgents.length === 0) {
-          setError("No agents found in this page / search");
-        }
-      } else {
-        const reason = data?.message || "Unexpected response format";
-        console.warn("Response issue:", reason, data);
-        setError(reason);
-      }
-    } catch (err) {
-      const msg =
-        err?.response?.data?.message ||
-        err?.response?.data?.error ||
-        err.message ||
-        "Failed to load agents";
-      console.error("Fetch error:", err);
-      setError(msg);
-    } finally {
-      setLoading(false);
-    }
-  };
+  } catch (error) {
+    console.error("Fetch error:", error);
+    toast.error('Failed to load delivery agents');
+  } finally {
+    setLoading(false);
+  }
+};
 
   useEffect(() => {
     fetchAgents();
-  }, [page, debouncedSearch]);
+  }, [page, search, activeFilter]);
+
+  const handleSearch = (e) => {
+    setSearch(e.target.value);
+    setPage(1);
+  };
 
   const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this agent?")) return;
-
+    if (!window.confirm('Are you sure you want to delete this agent?')) return;
+    
     try {
       await deleteDeliveryAgent(id);
+      toast.success('Delivery agent deleted');
       fetchAgents();
     } catch (err) {
-      console.error("Delete failed:", err);
-      alert("Could not delete agent");
+      toast.error('Failed to delete agent');
     }
   };
 
-  const handleToggle = async (id) => {
+  const handleToggleStatus = async (id) => {
     try {
-      console.log(`Toggling status for agent ${id}`);
-      const res = await toggleDeliveryAgentStatus(id);
-      console.log("Toggle response:", res?.data);
+      await toggleDeliveryAgentStatus(id);
+      toast.success('Status updated');
       fetchAgents();
     } catch (err) {
-      console.error("Toggle failed:", err?.response?.data || err.message);
-      alert("Failed to update agent status");
+      toast.error('Failed to update status');
     }
   };
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-        <h1 className="text-2xl font-bold text-gray-800">Delivery Agents</h1>
-
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-8 gap-4">
+        <h1 className="text-2xl md:text-3xl font-bold text-gray-800">Delivery Agents</h1>
+        
         <button
-          onClick={() => navigate("/admin/driver/create")}
-          className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg shadow-sm transition"
+          onClick={() => navigate('/admin/driver/create')}
+          className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition shadow-sm"
         >
-          + Add New Agent
+          <PlusIcon className="h-5 w-5" />
+          Add New Agent
         </button>
       </div>
 
-      {/* Search */}
-      <input
-        type="text"
-        placeholder="Search by name, phone or city..."
-        className="border border-gray-300 p-3 rounded-lg w-full mb-6 focus:outline-none focus:ring-2 focus:ring-blue-500"
-        value={search}
-        onChange={(e) => {
-          setSearch(e.target.value);
-          setPage(1);
-        }}
-      />
+      {/* Filters */}
+      <div className="mb-6 flex flex-col sm:flex-row gap-4">
+        <input
+          type="text"
+          placeholder="Search by name, phone, email..."
+          value={search}
+          onChange={handleSearch}
+          className="flex-1 px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+        />
+        
+        <select
+          value={activeFilter}
+          onChange={(e) => { setActiveFilter(e.target.value === 'true'); setPage(1); }}
+          className="px-4 py-2.5 border border-gray-300 rounded-lg bg-white focus:ring-indigo-500 focus:border-indigo-500"
+        >
+          <option value="true">Active Only</option>
+          <option value="false">All (Active + Inactive)</option>
+        </select>
+      </div>
 
-      {/* States */}
-      {loading ? (
-        <div className="text-center py-10 text-gray-500">Loading agents...</div>
-      ) : error ? (
-        <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg">
-          {error}
-        </div>
-      ) : agents.length === 0 ? (
-        <div className="text-center py-10 text-gray-500">
-          No delivery agents found {search.trim() && `matching "${search.trim()}"`}
-        </div>
-      ) : (
-        <div className="bg-white shadow-md rounded-lg overflow-hidden border border-gray-200">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead className="bg-gray-100 text-gray-700">
-                <tr>
-                  <th className="p-4 font-semibold">Name</th>
-                  <th className="p-4 font-semibold">Phone</th>
-                  <th className="p-4 font-semibold">City</th>
-                  <th className="p-4 font-semibold">Bike Brand</th>
-                  <th className="p-4 font-semibold">Status</th>
-                  <th className="p-4 font-semibold text-center">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {agents.map((agent) => (
-                  <tr key={agent._id} className="border-t hover:bg-gray-50">
-                    <td className="p-4">{agent.name || "—"}</td>
-                    <td className="p-4">
-                      {agent.countryCode || ""}{agent.phoneNumber || "—"}
-                    </td>
-                    <td className="p-4">{agent.city || "—"}</td>
-                    <td className="p-4">{agent.bikeBrand || "—"}</td>
-                    <td className="p-4">
-                      <button
-                        onClick={() => handleToggle(agent._id)}
-                        className={`px-4 py-1 rounded-full text-sm font-medium text-white transition ${
-                          agent.isActive
-                            ? "bg-green-600 hover:bg-green-700"
-                            : "bg-red-600 hover:bg-red-700"
-                        }`}
-                      >
-                        {agent.isActive ? "Active" : "Inactive"}
-                      </button>
-                    </td>
-                    <td className="p-4 text-center space-x-4">
-                      <button
-                        onClick={() => navigate(`/admin/driver/edit/${agent._id}`)}
-                        className="text-blue-600 hover:text-blue-800 font-medium"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDelete(agent._id)}
-                        className="text-red-600 hover:text-red-800 font-medium"
-                      >
-                        Delete
-                      </button>
-                    </td>
+      {/* Table */}
+      <div className="bg-white shadow-sm rounded-xl overflow-hidden border border-gray-200">
+        {loading ? (
+          <div className="py-12 text-center text-gray-500">Loading...</div>
+        ) : agents.length === 0 ? (
+          <div className="py-12 text-center text-gray-500">No delivery agents found</div>
+        ) : (
+          <>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Name</th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Phone</th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Email</th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Vehicle</th>
+                    <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Status</th>
+                    <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex justify-center items-center gap-4 py-4 border-t">
-              <button
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-                disabled={page === 1}
-                className="px-4 py-2 bg-gray-200 rounded disabled:opacity-50"
-              >
-                Previous
-              </button>
-              <span className="text-gray-700">
-                Page {page} of {totalPages}
-              </span>
-              <button
-                onClick={() => setPage((p) => p + 1)}
-                disabled={page === totalPages}
-                className="px-4 py-2 bg-gray-200 rounded disabled:opacity-50"
-              >
-                Next
-              </button>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {agents.map((agent) => (
+                    <tr key={agent._id} className="hover:bg-gray-50 transition">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="font-medium text-gray-900">{agent.name}</div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-gray-600">{agent.phoneNumber}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-gray-600">{agent.email || '-'}</td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="text-sm text-gray-700">{agent.bikeNumber || '-'}</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex px-2.5 py-1 text-xs font-medium rounded-full ${
+                          agent.isActive 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {agent.isActive ? 'Active' : 'Inactive'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                        <button
+                          onClick={() => navigate(`/admin/driver/edit/${agent._id}`)}
+                          className="text-indigo-600 hover:text-indigo-900 mr-4"
+                        >
+                          <PencilIcon className="h-5 w-5 inline" />
+                        </button>
+                        <button
+                          onClick={() => handleToggleStatus(agent._id)}
+                          className="text-blue-600 hover:text-blue-900 mr-4"
+                          title={agent.isActive ? 'Deactivate' : 'Activate'}
+                        >
+                          <PowerIcon className="h-5 w-5 inline" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(agent._id)}
+                          className="text-red-600 hover:text-red-900"
+                        >
+                          <TrashIcon className="h-5 w-5 inline" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
-          )}
-        </div>
-      )}
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="px-6 py-4 flex items-center justify-between border-t border-gray-200 bg-gray-50">
+                <button
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="px-4 py-2 border border-gray-300 rounded-md text-sm disabled:opacity-50"
+                >
+                  Previous
+                </button>
+                <span className="text-sm text-gray-700">
+                  Page {page} of {totalPages}
+                </span>
+                <button
+                  onClick={() => setPage(p => p + 1)}
+                  disabled={page === totalPages}
+                  className="px-4 py-2 border border-gray-300 rounded-md text-sm disabled:opacity-50"
+                >
+                  Next
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 };
 
-export default DeliveryAgent;
+export default DeliveryAgents;

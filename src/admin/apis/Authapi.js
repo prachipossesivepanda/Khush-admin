@@ -6,62 +6,52 @@ import { apiConnector } from "../services/Apiconnector";
  * ================================
  */
 export const authEndpoints = {
-  REGISTER: "/auth/register",        // send OTP
-  VERIFY_OTP: "/admin/verify-otp",    // verify OTP
-  LOGIN: "/admin/login",              // (if backend supports)
-  LOGOUT: "/admin/logout",            // logout endpoint
-  GET_PROFILE: "/auth/profile",      // (optional)
+  REGISTER: "/auth/register",          // send OTP
+  VERIFY_OTP: "/admin/verify-otp",     // verify OTP
+  RESEND_OTP: "/admin/resend-otp",     // resend OTP  ✅ NEW
+  LOGIN: "/admin/login",
+  LOGOUT: "/admin/logout",
+  GET_PROFILE: "/auth/profile",
 };
 
 /**
  * ================================
  * SEND OTP / REGISTER USER
  * ================================
- * @param {Object} data
- * {
- *   name: string,
- *   countryCode: string,
- *   phoneNumber: string,
- *   role: string
- * }
  */
 export const registerUser = (data) => {
-  return apiConnector(
-    "POST",
-    authEndpoints.REGISTER,
-    data
-  );
+  return apiConnector("POST", authEndpoints.REGISTER, data);
 };
 
 /**
  * ================================
  * VERIFY OTP
  * ================================
- * @param {Object} data
- * {
- *   userId: string,
- *   otp: string
- * }
  */
 export const verifyOtp = (data) => {
-  return apiConnector(
-    "POST",
-    authEndpoints.VERIFY_OTP,
-    data
-  );
+  return apiConnector("POST", authEndpoints.VERIFY_OTP, data);
 };
 
 /**
  * ================================
- * LOGIN (OPTIONAL)
+ * RESEND OTP  ✅ NEW
+ * ================================
+ * @param {Object} data
+ * {
+ *   userId: string
+ * }
+ */
+export const resendOtp = (data) => {
+  return apiConnector("POST", authEndpoints.RESEND_OTP, data);
+};
+
+/**
+ * ================================
+ * LOGIN
  * ================================
  */
 export const loginUser = (data) => {
-  return apiConnector(
-    "POST",
-    authEndpoints.LOGIN,
-    data
-  );
+  return apiConnector("POST", authEndpoints.LOGIN, data);
 };
 
 /**
@@ -70,22 +60,14 @@ export const loginUser = (data) => {
  * ================================
  */
 export const logoutUser = () => {
-  console.log("🚪 Logging out user...");
-  return apiConnector(
-    "POST",
-    authEndpoints.LOGOUT
-  );
+  return apiConnector("POST", authEndpoints.LOGOUT);
 };
 
 /**
  * ================================
- * GET USER PROFILE (OPTIONAL)
- * Token automatically added via interceptor
+ * GET USER PROFILE
  * ================================
  */
 export const getUserProfile = () => {
-  return apiConnector(
-    "GET",
-    authEndpoints.GET_PROFILE
-  );
+  return apiConnector("GET", authEndpoints.GET_PROFILE);
 };

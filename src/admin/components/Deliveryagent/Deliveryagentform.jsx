@@ -1,187 +1,186 @@
-import React, { useEffect, useState } from "react";
-import {
-  createDeliveryAgent,
-  getDeliveryAgentById,
-  updateDeliveryAgent,
-} from "../../apis/Driverapi";
-import { useNavigate, useParams } from "react-router-dom";
+// src/pages/admin/DeliveryAgentForm.jsx
+import React, { useState, useEffect } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { 
+  createDeliveryAgent, 
+  getDeliveryAgentById, 
+  updateDeliveryAgent 
+} from '../../apis/Driverapi';
+import { toast } from 'react-toastify';
 
 const DeliveryAgentForm = () => {
-  const navigate = useNavigate();
   const { id } = useParams();
+  const navigate = useNavigate();
   const isEdit = !!id;
 
-  const [loading, setLoading] = useState(false);
-
   const [formData, setFormData] = useState({
-    name: "",
-    countryCode: "+91",
-    phoneNumber: "",
-    email: "",
-    address: "",
-    city: "",
-    pinCode: "",
-    licenseNumber: "",
-    licenseExpiry: "",
-    bikeNumber: "",
-    bikeModel: "",
-    bikeBrand: "",
-    licenseImage: null, // 🔥 file
+    name: '',
+    phone: '',
+    email: '',
+    vehicleNumber: '',
+    vehicleType: 'bike', // bike, scooter, car etc.
+    isActive: true,
   });
 
-  // =============================
-  // Prefill in Edit Mode
-  // =============================
+  const [loading, setLoading] = useState(false);
+  const [fetching, setFetching] = useState(isEdit);
 
   useEffect(() => {
     if (isEdit) {
-      fetchAgent();
+      const loadAgent = async () => {
+        try {
+          const res = await getDeliveryAgentById(id);
+          const agent = res.data?.data || res.data;
+          setFormData({
+            name: agent.name || '',
+            phone: agent.phone || '',
+            email: agent.email || '',
+            vehicleNumber: agent.vehicleNumber || '',
+            vehicleType: agent.vehicleType || 'bike',
+            isActive: agent.isActive !== false,
+          });
+        } catch (err) {
+          toast.error('Failed to load agent data');
+          navigate('/admin/driver');
+        } finally {
+          setFetching(false);
+        }
+      };
+      loadAgent();
     }
-  }, [id]);
-
-  const fetchAgent = async () => {
-    try {
-      setLoading(true);
-      const res = await getDeliveryAgentById(id);
-      const data = res?.data?.data;
-
-      setFormData((prev) => ({
-        ...prev,
-        name: data?.name || "",
-        countryCode: data?.countryCode || "+91",
-        phoneNumber: data?.phoneNumber || "",
-        email: data?.email || "",
-        address: data?.address || "",
-        city: data?.city || "",
-        pinCode: data?.pinCode || "",
-        licenseNumber: data?.licenseNumber || "",
-        licenseExpiry: data?.licenseExpiry
-          ? data.licenseExpiry.split("T")[0]
-          : "",
-        bikeNumber: data?.bikeNumber || "",
-        bikeModel: data?.bikeModel || "",
-        bikeBrand: data?.bikeBrand || "",
-      }));
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // =============================
-  // Handle Change
-  // =============================
+  }, [id, isEdit, navigate]);
 
   const handleChange = (e) => {
-    const { name, value, files } = e.target;
-
-    if (name === "licenseImage") {
-      setFormData({ ...formData, licenseImage: files[0] });
-    } else {
-      setFormData({ ...formData, [name]: value });
-    }
+    const { name, value, type, checked } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
+    }));
   };
-
-  // =============================
-  // Submit
-  // =============================
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setLoading(true);
 
     try {
-      setLoading(true);
-
-      const data = new FormData();
-
-      Object.keys(formData).forEach((key) => {
-        if (formData[key] !== null) {
-          data.append(key, formData[key]);
-        }
-      });
-
       if (isEdit) {
-        await updateDeliveryAgent(id, data);
+        await updateDeliveryAgent(id, formData);
+        toast.success('Delivery agent updated successfully');
       } else {
-        await createDeliveryAgent(data);
+        await createDeliveryAgent(formData);
+        toast.success('Delivery agent created successfully');
       }
-
-      navigate("/admin/driver");
+      navigate('/admin/driver');
     } catch (err) {
-      console.error(err);
+      toast.error(err.response?.data?.message || 'Operation failed');
     } finally {
       setLoading(false);
     }
   };
 
-  // =============================
-  // UI
-  // =============================
+  if (fetching) {
+    return <div className="p-10 text-center">Loading agent data...</div>;
+  }
 
   return (
-    <div className="p-6 bg-gray-100 min-h-screen">
-      <div className="max-w-4xl mx-auto bg-white shadow-xl rounded-2xl p-8">
-
-        {/* 🔙 Back Button */}
-        <button
-          onClick={() => navigate("/admin/driver")}
-          className="mb-4 text-sm text-gray-600 hover:text-black"
-        >
-          ← Back to Drivers
-        </button>
-
-        <h2 className="text-2xl font-bold mb-6">
-          {isEdit ? "Edit Delivery Agent" : "Create Delivery Agent"}
+    <div className="max-w-2xl mx-auto p-6">
+      <div className="bg-white shadow-md rounded-xl p-8 border border-gray-200">
+        <h2 className="text-2xl font-bold text-gray-800 mb-6">
+          {isEdit ? 'Edit Delivery Agent' : 'Create New Delivery Agent'}
         </h2>
 
-        {loading && <p className="mb-4">Loading...</p>}
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
+            <input
+              type="text"
+              name="name"
+              value={formData.name}
+              onChange={handleChange}
+              required
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
+            />
+          </div>
 
-        <form onSubmit={handleSubmit} className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number *</label>
+            <input
+              type="tel"
+              name="phone"
+              value={formData.phone}
+              onChange={handleChange}
+              required
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
+            />
+          </div>
 
-          {Object.keys(formData).map((key) =>
-            key === "licenseImage" ? (
-              <div key={key} className="col-span-2">
-                <label className="block mb-1 font-medium">
-                  License Image
-                </label>
-                <input
-                  type="file"
-                  name="licenseImage"
-                  onChange={handleChange}
-                  className="border p-2 rounded-lg w-full"
-                />
-              </div>
-            ) : (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+            <input
+              type="email"
+              name="email"
+              value={formData.email}
+              onChange={handleChange}
+              className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Vehicle Number</label>
               <input
-                key={key}
-                type={key === "licenseExpiry" ? "date" : "text"}
-                name={key}
-                placeholder={key}
-                value={formData[key]}
+                type="text"
+                name="vehicleNumber"
+                value={formData.vehicleNumber}
                 onChange={handleChange}
-                className="border p-3 rounded-lg"
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500"
               />
-            )
-          )}
+            </div>
 
-          <div className="col-span-2 flex gap-4 mt-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Vehicle Type</label>
+              <select
+                name="vehicleType"
+                value={formData.vehicleType}
+                onChange={handleChange}
+                className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 bg-white"
+              >
+                <option value="bike">Bike</option>
+                <option value="scooter">Scooter</option>
+                <option value="car">Car</option>
+                <option value="van">Van</option>
+              </select>
+            </div>
+          </div>
+
+          <div className="flex items-center">
+            <input
+              type="checkbox"
+              name="isActive"
+              checked={formData.isActive}
+              onChange={handleChange}
+              className="h-4 w-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+            />
+            <label className="ml-2 block text-sm text-gray-700">Active / Available for deliveries</label>
+          </div>
+
+          <div className="flex gap-4 pt-6">
             <button
               type="submit"
-              className="bg-blue-600 text-white px-6 py-2 rounded-lg"
+              disabled={loading}
+              className="flex-1 bg-indigo-600 text-white py-3 px-6 rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition font-medium"
             >
-              {isEdit ? "Update" : "Create"}
+              {loading ? 'Saving...' : isEdit ? 'Update Agent' : 'Create Agent'}
             </button>
-
+            
             <button
               type="button"
-              onClick={() => navigate("/admin/driver")}
-              className="bg-gray-300 px-6 py-2 rounded-lg"
+              onClick={() => navigate('/admin/driver')}
+              className="flex-1 border border-gray-300 py-3 px-6 rounded-lg hover:bg-gray-50 transition"
             >
               Cancel
             </button>
           </div>
-
         </form>
       </div>
     </div>

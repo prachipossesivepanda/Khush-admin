@@ -1,79 +1,49 @@
 // Otp.jsx
 import React, { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux"; // ← added useSelector for debugging
+import { jwtDecode } from "jwt-decode";
+
 import Khush from "../../../assets/images/khushh.svg";
+import { verifyOtp, resendOtp } from "../../influencerapis/authapi";
+import { setToken } from "../../../redux/GlobalSlice";
 
 export default function Otp() {
   const { state } = useLocation();
   const navigate = useNavigate();
+  const dispatch = useDispatch();
+
+  // Optional: helps you see current token in Redux during debugging
+  const reduxToken = useSelector((state) => state.global?.token); // adjust path if your slice name / structure is different
+
   const mobile = state?.mobile || "xxxxxxxxxx";
 
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [timer, setTimer] = useState(30);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const inputRefs = useRef([]);
 
-  // ─── Debug: Component Mount ───────────────────────────────────────
   useEffect(() => {
-    console.log("[OTP] Component mounted");
-    console.log("[OTP] Received location state:", state);
-    console.log("[OTP] Mobile number:", mobile);
-    console.log("[OTP] Initial OTP:", otp);
-
-    // Auto-focus first input
     inputRefs.current[0]?.focus();
   }, []);
 
-  // ─── Timer countdown ───────────────────────────────────────────────
   useEffect(() => {
-    if (timer > 0) {
-      console.log(`[OTP Timer] Starting countdown from ${timer}`);
-      const interval = setInterval(() => {
-        setTimer((prev) => {
-          const next = prev - 1;
-          if (next % 5 === 0 || next <= 5) {
-            console.log(`[OTP Timer] ${next}s remaining`);
-          }
-          return next;
-        });
-      }, 1000);
-
-      return () => {
-        console.log("[OTP Timer] Clearing interval");
-        clearInterval(interval);
-      };
-    } else {
-      console.log("[OTP Timer] Reached 0 → resend enabled");
-    }
+    if (timer <= 0) return;
+    const interval = setInterval(() => setTimer((prev) => prev - 1), 1000);
+    return () => clearInterval(interval);
   }, [timer]);
 
   const handleOtpChange = (value, index) => {
-    if (isNaN(value) || value.length > 1) return;
-
-    console.log(`[OTP Input] Changed index ${index} → value "${value}"`);
-
+    if (!/^\d*$/.test(value)) return;
     const newOtp = [...otp];
-    newOtp[index] = value;
+    newOtp[index] = value.slice(-1);
     setOtp(newOtp);
-
-    console.log("[OTP Input] Current OTP array:", newOtp);
-    console.log("[OTP Input] Current code:", newOtp.join(""));
-
-    // Auto-focus next
-    if (value && index < 5) {
-      console.log(`[OTP Input] Moving focus → ${index + 1}`);
-      inputRefs.current[index + 1]?.focus();
-    }
-
-    // Auto-focus previous on delete (when field becomes empty)
-    if (!value && index > 0) {
-      console.log(`[OTP Input] Moving focus back → ${index - 1}`);
-      inputRefs.current[index - 1]?.focus();
-    }
+    if (value && index < 5) inputRefs.current[index + 1]?.focus();
   };
 
   const handleKeyDown = (e, index) => {
     if (e.key === "Backspace" && !otp[index] && index > 0) {
-      console.log(`[OTP KeyDown] Backspace on empty field → focus ${index - 1}`);
       inputRefs.current[index - 1]?.focus();
     }
   };
@@ -81,119 +51,201 @@ export default function Otp() {
   const handlePaste = (e) => {
     e.preventDefault();
     const pasted = e.clipboardData.getData("text").replace(/\D/g, "");
-    console.log("[OTP Paste] Raw pasted content:", e.clipboardData.getData("text"));
-    console.log("[OTP Paste] Cleaned digits:", pasted);
+    const digits = pasted.split("").slice(0, 6);
+    const newOtp = ["", "", "", "", "", ""];
+    digits.forEach((d, i) => (newOtp[i] = d));
+    setOtp(newOtp);
+    if (digits.length > 0)
+      inputRefs.current[Math.min(digits.length, 5)]?.focus();
+  };
 
-    if (pasted.length > 0) {
-      const digits = pasted.split("").slice(0, 6);
-      console.log("[OTP Paste] Applying digits:", digits);
+  const handleVerify = async () => {
+    const code = otp.join("");
+    if (code.length !== 6) {
+      setError("Please enter 6 digit OTP");
+      return;
+    }
 
-      setOtp((prev) => {
-        const newOtp = [...prev];
-        digits.forEach((d, i) => {
-          if (i < 6) newOtp[i] = d;
-        });
-        console.log("[OTP Paste] New OTP after paste:", newOtp);
-        return newOtp;
-      });
+    try {
+      setLoading(true);
+      setError("");
+      console.log("[OTP] Starting verification for code:", code);
 
-      const nextFocus = Math.min(digits.length, 5);
-      console.log(`[OTP Paste] Focusing index ${nextFocus} after paste`);
-      inputRefs.current[nextFocus]?.focus();
+      const userId = localStorage.getItem("userId");
+      console.log("[OTP] userId from localStorage:", userId);
+      if (!userId) throw new Error("User ID not found in localStorage");
+
+      const response = await verifyOtp(userId, code);
+      console.log("[OTP] Full API response:", response);
+
+      const token =
+        response?.accessToken || response?.data?.accessToken || null;
+
+      console.log(
+        "[OTP] Extracted token:",
+        token ? token.substring(0, 20) + "..." : "NO TOKEN",
+      );
+
+      if (!token) {
+        throw new Error("No token found in API response");
+      }
+
+      // ─── Dispatch happens here ───
+      dispatch(setToken(token));
+      console.log(
+        "[OTP] Dispatched setToken() with token (first 20 chars):",
+        token.substring(0, 20) + "...",
+      );
+
+      // Check immediately after dispatch
+      console.log(
+        "[OTP] Redux token right after dispatch (via useSelector):",
+        reduxToken ? "already updated?" : "not yet visible",
+      );
+
+      // Most reliable check — localStorage (assuming your slice saves it)
+      setTimeout(() => {
+        const lsToken = localStorage.getItem("token"); // ← change key if your slice uses different name
+        console.log(
+          "[OTP] localStorage 'token' after 400ms:",
+          lsToken
+            ? lsToken.substring(0, 20) + "..."
+            : "NOT FOUND IN LOCALSTORAGE",
+        );
+      }, 400);
+
+      // ─── JWT Decoding ───
+      let decoded;
+      try {
+        decoded = jwtDecode(token);
+        console.log("[OTP] Decoded JWT payload:", decoded);
+      } catch (decodeErr) {
+        console.error("[OTP] JWT decode failed:", decodeErr.message);
+        throw decodeErr;
+      }
+
+      const role = (
+        decoded?.role ||
+        decoded?.userRole ||
+        decoded?.type ||
+        ""
+      ).toUpperCase();
+      console.log("[OTP] Extracted role:", role || "NO ROLE FOUND IN JWT");
+
+      // Navigation decision
+      console.log("[OTP] Deciding navigation based on role:", role);
+
+      switch (role) {
+        case "ADMIN":
+          console.log("[OTP] → Navigating to /admin/dashboard");
+          navigate("/admin/dashboard", { replace: true });
+          break;
+        case "INFLUENCER":
+          console.log("[OTP] → Navigating to /influencer/dashboard");
+          navigate("/influencer/dashboard", { replace: true });
+          break;
+        case "DRIVER":
+          console.log("[OTP] → Navigating to /driver/dashboard");
+          navigate("/driver/dashboard", { replace: true });
+          break;
+        case "SUBADMIN":
+          console.log("[OTP] → Navigating to /subadmin/dashboard");
+          navigate("/subadmin/dashboard", { replace: true });
+          break;
+        default:
+          console.log("[OTP] → Unknown / missing role → Navigating to /");
+          navigate("/", { replace: true });
+      }
+    } catch (err) {
+      console.error("[OTP] Verification failed:", err);
+      setError(
+        err?.response?.data?.message ||
+          err?.message ||
+          "OTP verification failed. Please try again.",
+      );
+    } finally {
+      setLoading(false);
     }
   };
 
-const handleVerify = () => {
-  const code = otp.join("");
+  const handleResend = async () => {
+    try {
+      const userId = localStorage.getItem("userId");
+      if (!userId) throw new Error("User ID missing");
+      await resendOtp(userId);
+      setTimer(30);
+      setOtp(["", "", "", "", "", ""]);
+      inputRefs.current[0]?.focus();
+      setError("");
+      console.log("[RESEND] OTP resent successfully");
+    } catch (err) {
+      console.error("[RESEND] Failed:", err);
+      setError("Failed to resend OTP");
+    }
+  };
 
-  if (code.length !== 6) {
-    return;
-  }
+  // ────────────────────────────────────────────────
+  // UI (unchanged)
+  // ────────────────────────────────────────────────
 
-  // Direct navigation without token
-  navigate("/influencer/dashboard", { replace: true });
-};
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 sm:p-6">
       <div className="w-full max-w-md bg-white rounded-2xl shadow-xl border border-gray-200 overflow-hidden">
         <div className="p-8 sm:p-10 space-y-8">
-          {/* Logo & Title */}
           <div className="text-center space-y-4">
-            <img
-              src={Khush}
-              alt="Khush Logo"
-              className="w-24 mx-auto drop-shadow-md"
-            />
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
+            <img src={Khush} alt="Khush Logo" className="w-24 mx-auto" />
+            <h1 className="text-2xl font-bold text-gray-900">
               Verify Mobile Number
             </h1>
-            <p className="text-gray-600 text-sm sm:text-base">
-              Enter the OTP sent to{" "}
-              <span className="font-semibold text-gray-800">
-                +91 {mobile}
-              </span>
+            <p className="text-gray-600 text-sm">
+              Enter OTP sent to{" "}
+              <span className="font-semibold">+91 {mobile}</span>
             </p>
           </div>
 
-          {/* OTP Inputs */}
-          <div className="flex justify-center gap-3 sm:gap-4 my-6">
+          <div className="flex justify-center gap-3 my-6">
             {otp.map((digit, index) => (
               <input
                 key={index}
                 ref={(el) => (inputRefs.current[index] = el)}
-                id={`otp-${index}`}
                 type="text"
+                inputMode="numeric"
                 maxLength={1}
                 value={digit}
                 onChange={(e) => handleOtpChange(e.target.value, index)}
                 onKeyDown={(e) => handleKeyDown(e, index)}
                 onPaste={handlePaste}
-                onFocus={(e) => e.target.select()}
-                className="w-12 sm:w-14 h-14 sm:h-16 text-center text-2xl sm:text-3xl font-bold 
-                           border border-gray-300 rounded-xl 
-                           focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 
-                           bg-white shadow-sm transition-all outline-none"
+                className="w-12 h-14 text-center text-2xl font-bold border border-gray-300 rounded-xl focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200 outline-none"
               />
             ))}
           </div>
 
-          {/* Verify Button */}
+          {error && <p className="text-red-500 text-center text-sm">{error}</p>}
+
           <button
             onClick={handleVerify}
-            className="w-full bg-gray-900 hover:bg-gray-800 
-                       text-white font-semibold py-4 rounded-xl 
-                       text-lg shadow-md transition-all duration-300 
-                       hover:shadow-lg active:scale-[0.98]"
+            disabled={loading}
+            className="w-full bg-gray-900 hover:bg-gray-800 text-white font-semibold py-4 rounded-xl text-lg transition-all duration-300 disabled:opacity-50"
           >
-            Verify OTP
+            {loading ? "Verifying..." : "Verify OTP"}
           </button>
 
-          {/* Resend Timer */}
           <div className="text-center">
-            <p className="text-sm text-gray-600">
-              {timer > 0 ? (
-                <>
-                  Resend OTP in{" "}
-                  <span className="font-medium">
-                    00:{timer.toString().padStart(2, "0")}
-                  </span>
-                </>
-              ) : (
-                <button
-                  onClick={() => {
-                    console.log("[OTP Resend] Resend button clicked");
-                    setTimer(30);
-                    setOtp(["", "", "", "", "", ""]);
-                    console.log("[OTP Resend] OTP reset & timer restarted");
-                    inputRefs.current[0]?.focus();
-                    alert("OTP resent! (mock mode)");
-                  }}
-                  className="text-indigo-600 hover:text-indigo-800 font-medium hover:underline"
-                >
-                  Resend OTP
-                </button>
-              )}
-            </p>
+            {timer > 0 ? (
+              <p className="text-sm text-gray-600">
+                Resend OTP in{" "}
+                <span className="font-medium">
+                  00:{timer.toString().padStart(2, "0")}
+                </span>
+              </p>
+            ) : (
+              <button
+                onClick={handleResend}
+                className="text-indigo-600 font-medium hover:underline"
+              >
+                Resend OTP
+              </button>
+            )}
           </div>
         </div>
       </div>
