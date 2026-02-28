@@ -340,7 +340,7 @@ const Sidebar = () => {
               
             </Link>
 
-            <Link
+            {/* <Link
               to="/admin/status"
               className={`flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-white hover:text-black transition-all duration-200 font-medium group ${
                 isActive("/admin/status") ? "bg-white/10 text-white" : ""
@@ -353,7 +353,7 @@ const Sidebar = () => {
               <span>Status</span>
 
               
-            </Link>
+            </Link> */}
 
             <Link
               to="/admin/filters"
@@ -418,6 +418,19 @@ const Sidebar = () => {
                 className="text-gray-400 group-hover:text-black"
               />
               <span>Cart</span>
+            </Link>
+
+             <Link
+              to="/admin/reviews"
+              className={`flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-white hover:text-black transition-all duration-200 font-medium group ${
+                isActive("/admin/reviews") ? "bg-white/10 text-white" : ""
+              }`}
+            >
+              <Receipt
+                size={20}
+                className="text-gray-400 group-hover:text-black"
+              />
+              <span>Reviews</span>
             </Link>
 
             <Link

@@ -31,7 +31,7 @@ const ProtectedRoute = ({ allowedRoles = [], redirectTo = null, children }) => {
     }
   }
 
-  return <>{children}</>;
+   return children ? children : <Outlet />;
 };
 
 // ────────────────────────────────────────────────

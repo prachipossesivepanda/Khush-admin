@@ -33,10 +33,9 @@ const DeliveryAgentForm = () => {
           const agent = res.data?.data || res.data;
           setFormData({
             name: agent.name || '',
-            phone: agent.phone || '',
-            email: agent.email || '',
-            vehicleNumber: agent.vehicleNumber || '',
-            vehicleType: agent.vehicleType || 'bike',
+           phone: agent.phoneNumber || '',
+vehicleNumber: agent.bikeNumber || '',
+vehicleType: agent.bikeModel || 'bike',
             isActive: agent.isActive !== false,
           });
         } catch (err) {

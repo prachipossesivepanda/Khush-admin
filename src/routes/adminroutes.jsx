@@ -49,6 +49,7 @@ import Exchanges from "../admin/components/exchange/exchangePolicy";
 import Status from "../admin/components/Status/Status";
 import StatusPage from "../admin/components/Status/Statusform";
 import Orders from "../admin/components/orders/order";
+import Reviews from "../admin/components/Review/Reviews";
 const AdminRoutes = () => {
   return (
     <Routes>
@@ -143,6 +144,7 @@ const AdminRoutes = () => {
         <Route path="influencer/coupons/create" element={<InfluencerCouponsForm />} />
         <Route path="influencer/coupons/edit/:id" element={<InfluencerCouponsForm />} />
         <Route  path="influencer/:id/coupons" element={<InfluencerCouponManage/>}/>
+        <Route path="reviews" element={<Reviews/>}/>
       </Route>
 
       <Route path="*" element={<h1>404 - Page Not Found</h1>} />
