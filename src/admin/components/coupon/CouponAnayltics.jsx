@@ -1,15 +1,13 @@
 // src/pages/admin/CouponAnalytics.jsx
 import React, { useEffect, useState } from 'react';
-import { 
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, 
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
 } from 'recharts';
-import { 
-  TrendingUp, Users, DollarSign, Percent, 
-  Ticket, Clock, RefreshCw, AlertCircle, ChevronLeft, ChevronRight 
+import {
+  TrendingUp, Users, DollarSign, Percent,
+  Ticket, Clock, RefreshCw, AlertCircle, ChevronLeft, ChevronRight
 } from 'lucide-react';
 import { getCouponAnalytics } from '../../apis/couponapi';
-
-const COLORS = ['#4f46e5', '#7c3aed', '#c026d3', '#e11d48', '#ea580c'];
 
 const CouponAnalytics = () => {
   const [data, setData] = useState(null);
@@ -22,15 +20,15 @@ const CouponAnalytics = () => {
     setLoading(true);
     setError(null);
     try {
-      const response = await getCouponAnalytics();
-      if (response?.success) {
-        setData(response.data);
-        setCurrentPage(1); // reset to page 1 on new data load
+      const res = await getCouponAnalytics();
+      if (res?.success) {
+        setData(res.data);
+        setCurrentPage(1);
       } else {
-        setError(response?.message || "Failed to load analytics");
+        setError(res?.message || 'Failed to load analytics');
       }
     } catch (err) {
-      setError("Network error or server is unreachable");
+      setError('Network error. Please check your connection.');
       console.error(err);
     } finally {
       setLoading(false);
@@ -44,9 +42,9 @@ const CouponAnalytics = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <RefreshCw className="w-10 h-10 animate-spin text-indigo-700 mx-auto mb-4" />
-          <p className="text-lg font-medium text-gray-700">Loading coupon analytics...</p>
+        <div className="flex flex-col items-center gap-4">
+          <RefreshCw className="h-12 w-12 animate-spin text-indigo-600" />
+          <p className="text-lg font-medium text-gray-700">Loading analytics...</p>
         </div>
       </div>
     );
@@ -55,265 +53,212 @@ const CouponAnalytics = () => {
   if (error || !data) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
-        <div className="max-w-md w-full bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
-          <AlertCircle className="w-14 h-14 text-red-600 mx-auto mb-5" />
-          <h2 className="text-2xl font-semibold text-gray-900 mb-3">Failed to load data</h2>
-          <p className="text-gray-600 mb-6">{error || "An unexpected error occurred."}</p>
+        <div className="w-full max-w-md bg-white rounded-2xl shadow-lg border border-gray-200 p-8 text-center">
+          <AlertCircle className="mx-auto h-14 w-14 text-red-500 mb-5" />
+          <h2 className="text-2xl font-bold text-gray-900 mb-3">Something went wrong</h2>
+          <p className="text-gray-600 mb-6">{error}</p>
           <button
             onClick={fetchAnalytics}
-            className="inline-flex items-center gap-2 px-6 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition font-medium"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-gray-900 text-white rounded-xl hover:bg-gray-800 transition font-medium shadow-sm"
           >
-            <RefreshCw className="w-4 h-4" />
-            Retry
+            <RefreshCw size={18} />
+            Try Again
           </button>
         </div>
       </div>
     );
   }
 
-  const { 
-    summary, 
-    mostUsedCoupons, 
-    performanceByType, 
-    recentUsage 
-  } = data;
+  const { summary, mostUsedCoupons, performanceByType, recentUsage } = data;
 
-  const usageByType = performanceByType.map(item => ({
-    name: item.type,
-    value: item.totalUsage,
-    count: item.totalCoupons,
-    users: item.uniqueUsers
-  }));
+  // Pagination logic
+  const totalPages = Math.ceil(recentUsage.length / rowsPerPage);
+  const start = (currentPage - 1) * rowsPerPage;
+  const paginatedUsage = recentUsage.slice(start, start + rowsPerPage);
 
-  // ── Pagination logic for recentUsage ────────────────────────────────
-  const totalRows = recentUsage.length;
-  const totalPages = Math.ceil(totalRows / rowsPerPage);
-  const startIndex = (currentPage - 1) * rowsPerPage;
-  const endIndex = startIndex + rowsPerPage;
-  const currentUsage = recentUsage.slice(startIndex, endIndex);
-
-  const goToPage = (page) => {
-    if (page >= 1 && page <= totalPages) {
-      setCurrentPage(page);
-    }
-  };
-
-  const PaginationControls = () => {
-    if (totalPages <= 1) return null;
-
-    return (
-      <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex items-center justify-between text-sm">
-        <div className="text-gray-600">
-          Showing {startIndex + 1}–{Math.min(endIndex, totalRows)} of {totalRows}
-        </div>
-        
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => goToPage(currentPage - 1)}
-            disabled={currentPage === 1}
-            className="p-2 rounded-md border border-gray-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-100 transition"
-          >
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-
-          {Array.from({ length: totalPages }, (_, i) => i + 1)
-            .filter(p => 
-              p === 1 || 
-              p === totalPages || 
-              (p >= currentPage - 1 && p <= currentPage + 1)
-            )
-            .map((page, idx, arr) => (
-              <React.Fragment key={page}>
-                {idx > 0 && arr[idx - 1] !== page - 1 && (
-                  <span className="px-2 text-gray-400">...</span>
-                )}
-                <button
-                  onClick={() => goToPage(page)}
-                  className={`px-3 py-1.5 rounded-md border border-gray-300 transition ${
-                    page === currentPage
-                      ? 'bg-indigo-600 text-white border-indigo-600 font-medium'
-                      : 'hover:bg-gray-100'
-                  }`}
-                >
-                  {page}
-                </button>
-              </React.Fragment>
-            ))}
-
-          <button
-            onClick={() => goToPage(currentPage + 1)}
-            disabled={currentPage === totalPages}
-            className="p-2 rounded-md border border-gray-300 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-gray-100 transition"
-          >
-            <ChevronRight className="w-5 h-5" />
-          </button>
-        </div>
-      </div>
-    );
+  const changePage = (page) => {
+    if (page >= 1 && page <= totalPages) setCurrentPage(page);
   };
 
   return (
-    <div className="min-h-screen bg-gray-50/70 pb-16">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 lg:pt-10">
+    <div className="min-h-screen bg-gray-50 pb-16">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 pt-8 lg:pt-10">
 
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 mb-12">
+        <div className="mb-10 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6">
           <div>
-            <h1 className="text-3xl lg:text-4xl font-bold text-gray-900 tracking-tight">
+            <h1 className="text-3xl font-bold tracking-tight text-gray-900 lg:text-4xl">
               Coupon Analytics
             </h1>
-            <p className="mt-2 text-gray-600 text-lg">
-              Real-time overview of coupon usage and business impact
+            <p className="mt-2 text-lg text-gray-600">
+              Track performance, redemptions & business impact
             </p>
           </div>
           <button
             onClick={fetchAnalytics}
-            className="inline-flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-300 rounded-lg shadow-sm hover:bg-gray-50 text-gray-800 font-medium transition"
+            className="inline-flex items-center gap-2 rounded-xl border border-gray-300 bg-white px-5 py-2.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 transition"
           >
-            <RefreshCw className="w-4 h-4" />
-            Refresh Data
+            <RefreshCw size={18} />
+            Refresh
           </button>
         </div>
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-          <StatCard 
-            icon={<Ticket className="w-7 h-7 text-indigo-700" />}
+        {/* KPI Cards */}
+        <div className="mb-12 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          <KpiCard
+            icon={<Ticket className="h-7 w-7 text-indigo-600" />}
             title="Total Coupons"
-            value={summary.totalCoupons}
-            color="indigo"
+            value={summary.totalCoupons.toLocaleString()}
+            accent="indigo"
           />
-          <StatCard 
-            icon={<TrendingUp className="w-7 h-7 text-emerald-700" />}
+          <KpiCard
+            icon={<TrendingUp className="h-7 w-7 text-emerald-600" />}
             title="Active Coupons"
-            value={summary.activeCoupons}
-            color="emerald"
+            value={summary.activeCoupons.toLocaleString()}
+            accent="emerald"
           />
-          <StatCard 
-            icon={<Users className="w-7 h-7 text-violet-700" />}
+          <KpiCard
+            icon={<Users className="h-7 w-7 text-violet-600" />}
             title="Unique Users"
-            value={summary.totalUniqueUsers}
-            color="violet"
+            value={summary.totalUniqueUsers.toLocaleString()}
+            accent="violet"
           />
-          <StatCard 
-            icon={<DollarSign className="w-7 h-7 text-amber-700" />}
-            title="Total Discount Given"
+          <KpiCard
+             icon={<DollarSign className="h-4 w-4 text-amber-600" />}
+            title="Total Discount"
             value={`₹${Number(summary.totalDiscountGiven).toLocaleString('en-IN')}`}
-            color="amber"
+            accent="amber"
           />
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
-          {/* Most Used Coupons */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200/80 p-7">
-            <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center gap-3">
-              <Percent className="w-6 h-6 text-indigo-700" />
-              Top Performing Coupons
-            </h2>
-
-            {mostUsedCoupons.length === 0 ? (
-              <div className="text-center py-12 text-gray-500 italic">
-                No coupon redemptions recorded yet
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {mostUsedCoupons.slice(0, 5).map((coupon) => (
-                  <div 
-                    key={coupon.couponId}
-                    className="flex items-center justify-between py-4 px-5 bg-gray-50/70 rounded-lg border border-gray-100 hover:bg-gray-100 transition"
-                  >
-                    <div>
-                      <div className="font-semibold text-gray-900">{coupon.couponCode}</div>
-                      <div className="text-sm text-gray-600 mt-0.5">
-                        {coupon.discountType} • ₹{coupon.discountValue}
+        <div className="mb-12 grid grid-cols-1 gap-8 lg:grid-cols-2">
+          {/* Top Coupons */}
+          <div className="rounded-2xl border border-gray-200 bg-white shadow-sm">
+            <div className="border-b border-gray-100 px-6 py-5">
+              <h2 className="flex items-center gap-2.5 text-xl font-semibold text-gray-900">
+                <Percent className="h-5 w-5 text-indigo-600" />
+                Top Performing Coupons
+              </h2>
+            </div>
+            <div className="p-6">
+              {mostUsedCoupons.length === 0 ? (
+                <p className="py-12 text-center text-gray-500 italic">
+                  No redemptions recorded yet
+                </p>
+              ) : (
+                <div className="space-y-4">
+                  {mostUsedCoupons.slice(0, 5).map((c) => (
+                    <div
+                      key={c.couponId}
+                      className="flex items-center justify-between rounded-xl bg-gray-50 px-5 py-4 hover:bg-gray-100 transition"
+                    >
+                      <div>
+                        <div className="font-semibold text-gray-900">{c.couponCode}</div>
+                        <div className="mt-0.5 text-sm text-gray-600">
+                          {c.discountType} • ₹{c.discountValue}
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-2xl font-bold text-indigo-700">{c.totalUsage}</div>
+                        <div className="text-xs text-gray-500">uses</div>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <div className="text-2xl font-bold text-indigo-700">{coupon.totalUsage}</div>
-                      <div className="text-xs text-gray-500 mt-0.5">redemptions</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Performance by Type */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200/80 p-7">
-            <h2 className="text-xl font-semibold text-gray-900 mb-6 flex items-center gap-3">
-              <BarChart className="w-6 h-6 text-purple-700" strokeWidth={2} />
-              Usage by Discount Type
-            </h2>
-
-            <div className="h-72 pt-2">
+          {/* Bar Chart – Usage by Type */}
+          <div className="rounded-2xl border border-gray-200 bg-white shadow-sm">
+            <div className="border-b border-gray-100 px-6 py-5">
+              <h2 className="flex items-center gap-2.5 text-xl font-semibold text-gray-900">
+                <BarChart className="h-5 w-5 text-indigo-600" strokeWidth={2.5} />
+                Usage by Discount Type
+              </h2>
+            </div>
+            <div className="h-80 p-6">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={performanceByType} margin={{ top: 5, right: 20, left: -10, bottom: 30 }}>
-                  <XAxis dataKey="type" axisLine={false} tick={{ fill: '#6b7280' }} />
-                  <YAxis axisLine={false} tick={{ fill: '#6b7280' }} />
-                  <Tooltip 
-                    cursor={{ fill: 'rgba(99, 102, 241, 0.08)' }}
-                    contentStyle={{ 
-                      background: 'white', 
-                      border: '1px solid #e5e7eb', 
-                      borderRadius: '8px', 
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.1)' 
-                    }}
-                    formatter={(value) => [`${value} uses`, '']}
-                    labelStyle={{ color: '#111827', fontWeight: 600 }}
+                <BarChart data={performanceByType} margin={{ top: 10, right: 30, left: -20, bottom: 30 }}>
+                  <XAxis
+                    dataKey="type"
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: '#6b7280', fontSize: 13 }}
                   />
-                  <Bar dataKey="totalUsage" fill="#4f46e5" radius={[6, 6, 0, 0]} />
+                  <YAxis
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fill: '#6b7280', fontSize: 13 }}
+                  />
+                  <Tooltip
+                    cursor={{ fill: 'rgba(79, 70, 229, 0.08)' }}
+                    contentStyle={{
+                      backgroundColor: 'white',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: '12px',
+                      boxShadow: '0 4px 16px rgba(0,0,0,0.1)',
+                    }}
+                    labelStyle={{ color: '#111827', fontWeight: 600 }}
+                    formatter={(val) => [`${val} redemptions`, '']}
+                  />
+                  <Bar dataKey="totalUsage" fill="#4f46e5" radius={[6, 6, 0, 0]} barSize={32} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
           </div>
         </div>
 
-        {/* Recent Usage with Pagination */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200/80 overflow-hidden">
-          <div className="px-7 py-6 border-b border-gray-200">
-            <h2 className="text-xl font-semibold text-gray-900 flex items-center gap-3">
-              <Clock className="w-6 h-6 text-blue-700" />
+        {/* Recent Usage Table */}
+        <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
+          <div className="border-b border-gray-100 px-6 py-5">
+            <h2 className="flex items-center gap-2.5 text-xl font-semibold text-gray-900">
+              <Clock className="h-5 w-5 text-indigo-600" />
               Recent Redemptions
             </h2>
           </div>
 
           {recentUsage.length === 0 ? (
-            <div className="py-16 text-center text-gray-500 italic">
+            <div className="py-20 text-center text-gray-500 italic">
               No recent coupon usage
             </div>
           ) : (
             <>
               <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
-                  <thead className="bg-gray-50/70">
+                  <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Order ID</th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Customer</th>
-                      <th className="px-6 py-4 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Coupon</th>
-                      <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Discount</th>
-                      <th className="px-6 py-4 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Used At</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Order</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Customer</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Coupon</th>
+                      <th className="px-6 py-4 text-right text-xs font-semibold uppercase tracking-wider text-gray-600">Discount</th>
+                      <th className="px-6 py-4 text-right text-xs font-semibold uppercase tracking-wider text-gray-600">Used At</th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-gray-100">
-                    {currentUsage.map((usage, idx) => (
-                      <tr key={idx} className="hover:bg-gray-50/60 transition-colors">
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                          #{usage.orderId}
+                  <tbody className="divide-y divide-gray-200 bg-white">
+                    {paginatedUsage.map((u, i) => (
+                      <tr key={i} className="hover:bg-gray-50/70 transition-colors">
+                        <td className="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900">
+                          #{u.orderId}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">{usage.userName}</div>
-                          <div className="text-xs text-gray-500 mt-0.5">{usage.phoneNumber}</div>
+                        <td className="whitespace-nowrap px-6 py-4">
+                          <div className="text-sm font-medium text-gray-900">{u.userName}</div>
+                          <div className="text-xs text-gray-500">{u.phoneNumber}</div>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-800">
-                          {usage.couponCode}
+                        <td className="whitespace-nowrap px-6 py-4 text-sm font-medium text-gray-900">
+                          {u.couponCode}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-semibold text-emerald-700">
-                          ₹{Number(usage.discountAmount).toLocaleString('en-IN')}
+                        <td className="whitespace-nowrap px-6 py-4 text-right text-sm font-semibold text-emerald-700">
+                          ₹{Number(u.discountAmount).toLocaleString('en-IN')}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 text-right">
-                          {new Date(usage.usedAt).toLocaleString('en-IN', {
-                            day: '2-digit', month: 'short', year: 'numeric',
-                            hour: '2-digit', minute: '2-digit', hour12: true
+                        <td className="whitespace-nowrap px-6 py-4 text-right text-sm text-gray-600">
+                          {new Date(u.usedAt).toLocaleString('en-IN', {
+                            day: '2-digit',
+                            month: 'short',
+                            year: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            hour12: true,
                           })}
                         </td>
                       </tr>
@@ -322,28 +267,81 @@ const CouponAnalytics = () => {
                 </table>
               </div>
 
-              <PaginationControls />
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between border-t border-gray-200 bg-gray-50 px-6 py-4 text-sm">
+                  <div className="text-gray-600">
+                    Showing <span className="font-medium text-gray-900">{start + 1}–{Math.min(start + rowsPerPage, recentUsage.length)}</span> of {recentUsage.length}
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => changePage(currentPage - 1)}
+                      disabled={currentPage === 1}
+                      className="rounded-lg border border-gray-300 p-2 disabled:opacity-40 hover:bg-gray-100 transition"
+                    >
+                      <ChevronLeft size={20} />
+                    </button>
+
+                    {Array.from({ length: totalPages }, (_, i) => i + 1)
+                      .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 2)
+                      .map((p, idx, arr) => (
+                        <React.Fragment key={p}>
+                          {idx > 0 && arr[idx - 1] !== p - 1 && (
+                            <span className="px-1 text-gray-400">...</span>
+                          )}
+                          <button
+                            onClick={() => changePage(p)}
+                            className={`min-w-[2.5rem] rounded-lg border px-3 py-1.5 font-medium transition ${
+                              p === currentPage
+                                ? 'border-indigo-600 bg-indigo-600 text-white'
+                                : 'border-gray-300 hover:bg-gray-100'
+                            }`}
+                          >
+                            {p}
+                          </button>
+                        </React.Fragment>
+                      ))}
+
+                    <button
+                      onClick={() => changePage(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                      className="rounded-lg border border-gray-300 p-2 disabled:opacity-40 hover:bg-gray-100 transition"
+                    >
+                      <ChevronRight size={20} />
+                    </button>
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>
-
       </div>
     </div>
   );
 };
 
-const StatCard = ({ icon, title, value, color }) => (
-  <div className="bg-white rounded-xl shadow-sm border border-gray-200/80 p-6 hover:shadow transition-shadow">
-    <div className="flex items-center justify-between">
-      <div>
-        <p className="text-sm font-medium text-gray-500 tracking-wide">{title}</p>
-        <p className="text-3xl font-bold text-gray-900 mt-2">{value}</p>
-      </div>
-      <div className={`p-4 rounded-xl bg-${color}-50/70`}>
-        {icon}
+function KpiCard({ icon, title, value, accent }) {
+  const bgClass = {
+    indigo: 'bg-indigo-50 text-indigo-600',
+    emerald: 'bg-emerald-50 text-emerald-600',
+    violet: 'bg-violet-50 text-violet-600',
+    amber: 'bg-amber-50 text-amber-600',
+  }[accent];
+
+  return (
+    <div className="rounded-2xl border border-gray-200 bg-white p-6 shadow-sm hover:shadow transition-shadow">
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="text-sm font-medium uppercase tracking-wide text-gray-500">{title}</p>
+          <p className="mt-2 text-3xl font-bold text-gray-900">{value}</p>
+        </div>
+        <div className={`rounded-xl p-4 ${bgClass}`}>
+          {icon}
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
+}
 
 export default CouponAnalytics;

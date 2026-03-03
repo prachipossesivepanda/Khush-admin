@@ -1,153 +1,140 @@
-// src/components/DeliveryDashboard.jsx
-import React, { useState } from 'react';
-import { BellIcon, MapPinIcon, ClockIcon } from '@heroicons/react/24/outline';
+import { useState, useEffect } from "react";
+import { MapPin, Clock } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+export default function DriverDashboard() {
+  const [isAccepting, setIsAccepting] = useState(true);
+  const [activeTab, setActiveTab] = useState("orders");
+  const [visibleCount, setVisibleCount] = useState(4);
+  const navigate = useNavigate();
+  // Dummy orders data
+  const orders = Array.from({ length: 20 }, (_, i) => i + 1);
 
-const mockOrders = [
-  {
-    id: "12345687",
-    location: "GT Road, Ludhiana",
-    amount: "150.50",
-    itemId: "12345687",
-    payment: "COD",
-    orderTime: "01:10 PM",
-    deliveryTime: "01:45 PM",
-  },
-  {
-    id: "12345688",
-    location: "GT Road, Ludhiana",
-    amount: "150.50",
-    itemId: "12345687",
-    payment: "Online Payment",
-    orderTime: "01:10 PM",
-    deliveryTime: "01:45 PM",
-  },
-  {
-    id: "12345689",
-    location: "GT Road, Ludhiana",
-    amount: "150.50",
-    itemId: "12345687",
-    payment: "Online Payment",
-    orderTime: "01:10 PM",
-    deliveryTime: "01:45 PM",
-  },
-];
+  // Infinite Scroll
+  useEffect(() => {
+    const handleScroll = () => {
+      if (
+        window.innerHeight + window.scrollY >=
+        document.body.offsetHeight - 100
+      ) {
+        setVisibleCount((prev) => prev + 4);
+      }
+    };
 
-export default function DeliveryDashboard() {
-  const [acceptingPickups, setAcceptingPickups] = useState(true);
-  const [activeTab, setActiveTab] = useState('orders'); // 'orders' | 'exchange'
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
-      {/* Header / Top Bar */}
-      <div className="bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between sticky top-0 z-10">
-        <h1 className="text-lg font-bold text-gray-800">Orders</h1>
-        <div className="flex items-center gap-4">
-          <button className="relative">
-            <BellIcon className="h-6 w-6 text-gray-700" />
-            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
-              3
-            </span>
-          </button>
-        </div>
-      </div>
+    <div className="p-4 space-y-4 mt-8  min-h-screen">
+      {/* Top Section */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <img
+            src="https://i.pravatar.cc/40"
+            alt="profile"
+            className="w-10 h-10 rounded-full"
+          />
 
-      {/* Accepting Pick-ups Toggle */}
-      <div className="px-4 py-3 bg-white border-b border-gray-200">
-        <div className="flex items-center justify-between">
-          <span className="text-sm font-medium text-gray-700">
-            Accepting Pick-ups
-          </span>
-          <label className="relative inline-flex items-center cursor-pointer">
-            <input
-              type="checkbox"
-              checked={acceptingPickups}
-              onChange={() => setAcceptingPickups(!acceptingPickups)}
-              className="sr-only peer"
-            />
-            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div>
-          </label>
+          {/* Accepting Pickups Toggle */}
+          <div className="bg-white px-7 py-2 rounded-xl shadow flex items-center gap-4">
+            <span className="text-sm font-medium">
+              {isAccepting ? "Accepting Pick-ups" : "Not Accepting"}
+            </span>
+
+            <div
+              onClick={() => setIsAccepting(!isAccepting)}
+              className={`w-12 h-6 flex items-center rounded-full p-1 cursor-pointer transition-all duration-300 ${
+                isAccepting ? "bg-black" : "bg-gray-300"
+              }`}
+            >
+              <div
+                className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-all duration-300 ${
+                  isAccepting ? "translate-x-6" : "translate-x-0"
+                }`}
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-gray-200 p-2 rounded-xl shadow cursor-pointer">
+          🔔
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="px-4 pt-4">
-        <div className="inline-flex bg-gray-100 rounded-lg p-1">
-          <button
-            onClick={() => setActiveTab('orders')}
-            className={`px-5 py-2 text-sm font-medium rounded-md transition ${
-              activeTab === 'orders'
-                ? 'bg-white shadow text-gray-900'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            Orders
-          </button>
-          <button
-            onClick={() => setActiveTab('exchange')}
-            className={`px-5 py-2 text-sm font-medium rounded-md transition ${
-              activeTab === 'exchange'
-                ? 'bg-white shadow text-gray-900'
-                : 'text-gray-600 hover:text-gray-900'
-            }`}
-          >
-            Exchange Orders
-          </button>
-        </div>
+      <div className="flex gap-3">
+        <button
+          onClick={() => setActiveTab("orders")}
+          className={`px-5 py-2 rounded-lg text-sm transition ${
+            activeTab === "orders"
+              ? "bg-black text-white"
+              : "border border-black"
+          }`}
+        >
+          Orders
+        </button>
+
+        <button
+          onClick={() => navigate("/driver/exchange-orders")}
+          className={`px-5 py-2 rounded-lg text-sm transition ${
+            activeTab === "exchange"
+              ? "bg-black text-white"
+              : "border border-black"
+          }`}
+        >
+          Exchange Orders
+        </button>
       </div>
 
-      {/* Orders List */}
-      <div className="px-4 py-5 space-y-4">
-        {mockOrders.map((order) => (
-          <div
-            key={order.id}
-            className="bg-white  shadow-sm border border-gray-200 overflow-hidden"
-          >
-            {/* Top accent bar */}
-            <div className="h-1 bg-indigo-600"></div>
+      {/* Orders Cards */}
+      <div className="space-y-4">
+        {orders.slice(0, visibleCount).map((item) => (
+<div
+  key={item}
+  onClick={() => navigate(`/driver/orderdetails`)}
+  className="bg-white rounded-2xl p-4 shadow-md cursor-pointer active:scale-95 transition-transform duration-150"
+>            <h3 className="font-semibold mb-3">
+              {activeTab === "orders" ? "New Order!" : "Exchange Request!"}
+            </h3>
 
-            <div className="p-4">
-              <div className="flex justify-between items-start mb-3">
-                <h3 className="font-semibold text-gray-900">New Order!</h3>
-                <span
-                  className={`text-xs font-medium px-2.5 py-1 rounded-full ${
-                    order.payment === 'COD'
-                      ? 'bg-amber-100 text-amber-800'
-                      : 'bg-green-100 text-green-800'
-                  }`}
-                >
-                  {order.payment}
-                </span>
+            <div className="flex justify-between">
+              {/* Left */}
+              <div className="flex gap-3">
+                <MapPin size={18} className="text-gray-500 mt-1" />
+                <div>
+                  <p className="text-sm text-gray-600">GT Road, Ludhiana.</p>
+                  <p className="text-sm text-gray-500">
+                    Item ID - #{12345687 + item}
+                  </p>
+                </div>
               </div>
 
-              <div className="space-y-3 text-sm">
-                <div className="flex items-start gap-2">
-                  <MapPinIcon className="h-5 w-5 text-gray-500 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="text-gray-700">{order.location}</p>
-                    <p className="text-gray-500 text-xs mt-0.5">
-                      Item ID - #{order.itemId}
-                    </p>
-                  </div>
-                </div>
+              {/* Right */}
+              <div className="text-right">
+                <p className="text-sm font-medium">
+                  ₹{(150 + item).toFixed(2)}
+                </p>
+                <p className="text-sm font-semibold">
+                  {item % 2 === 0 ? "Online Payment" : "COD"}
+                </p>
+              </div>
+            </div>
 
-                <div className="flex items-center justify-between text-gray-600">
-                  <div className="flex items-center gap-1.5">
-                    <ClockIcon className="h-4 w-4" />
-                    <span>Order Received • {order.orderTime}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <ClockIcon className="h-4 w-4" />
-                    <span>Delivery • {order.deliveryTime}</span>
-                  </div>
+            {/* Time Section */}
+            <div className="flex justify-between mt-4 text-sm text-gray-600">
+              <div className="flex items-center gap-2">
+                <Clock size={16} />
+                <div>
+                  <p className="text-xs">Order Received</p>
+                  <p>01:10 PM</p>
                 </div>
+              </div>
 
-                <div className="pt-2 border-t border-gray-100 flex justify-between items-center">
-                  <span className="text-lg font-bold text-gray-900">
-                    ₹{order.amount}
-                  </span>
-                  <button className="bg-indigo-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition">
-                    Accept
-                  </button>
+              <div className="flex items-center gap-2">
+                <Clock size={16} />
+                <div>
+                  <p className="text-xs">Delivery Time</p>
+                  <p>01:45 PM</p>
                 </div>
               </div>
             </div>
@@ -155,23 +142,12 @@ export default function DeliveryDashboard() {
         ))}
       </div>
 
-      {/* Bottom Navigation */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200">
-        <div className="max-w-md mx-auto flex justify-around py-2">
-          <button className="flex flex-col items-center py-1 text-indigo-600">
-            <span className="text-2xl">🏠</span>
-            <span className="text-xs mt-0.5">Home</span>
-          </button>
-          <button className="flex flex-col items-center py-1 text-indigo-600">
-            <span className="text-2xl">📦</span>
-            <span className="text-xs mt-0.5">Orders</span>
-          </button>
-          <button className="flex flex-col items-center py-1 text-gray-500">
-            <span className="text-2xl">👤</span>
-            <span className="text-xs mt-0.5">Profile</span>
-          </button>
+      {/* Loading Indicator */}
+      {visibleCount < orders.length && (
+        <div className="text-center text-gray-500 py-4">
+          Loading more orders...
         </div>
-      </div>
+      )}
     </div>
   );
 }
