@@ -13,6 +13,7 @@ import {
   Link2,
   Percent,
   FileText,
+  X,
 } from "lucide-react";
 import {
   createSection,
@@ -101,8 +102,6 @@ const SectionForm = () => {
     try {
       setLoadingCategories(true);
       const res = await getAllCategories(page, categoryLimit, debouncedCategorySearchTerm);
-      console.log(`[CATEGORIES] page=${page}, search="${debouncedCategorySearchTerm}" →`, res?.data);
-      
       const data = res?.data?.data || res?.data || {};
       const cats = Array.isArray(data.categories) ? data.categories : data || [];
       setCategories(cats);
@@ -125,7 +124,6 @@ const SectionForm = () => {
   // ─── Load Subcategories ──────────────────────────────────────
   useEffect(() => {
     if (type !== "CATEGORY" || categoryIds.length === 0) {
-      console.log("[SUBCATS] Resetting - not CATEGORY or no categories selected");
       setSubcategoriesByCategory({});
       setSubcategoryMap({});
       setActiveSubcatTab(null);
@@ -137,23 +135,16 @@ const SectionForm = () => {
       const newSubs = { ...subcategoriesByCategory };
       const newMap = { ...subcategoryMap };
 
-      console.log("[SUBCATS] Loading for categories:", categoryIds);
-
       for (const catId of categoryIds) {
-        if (newSubs[catId]) {
-          console.log(`[SUBCATS] Already loaded for ${catId}`);
-          continue;
-        }
+        if (newSubs[catId]) continue;
 
         try {
           const res = await getSubcategoriesByCategory(catId, 1, 50);
-          console.log(`[SUBCATS] ${catId} →`, res?.data);
-
-          const subsList = res?.data?.data?.subcategories ||
-                           res?.data?.subcategories ||
-                           res?.data ||
-                           [];
-
+          const subsList =
+            res?.data?.data?.subcategories ||
+            res?.data?.subcategories ||
+            res?.data ||
+            [];
           newSubs[catId] = Array.isArray(subsList) ? subsList : [];
           if (!(catId in newMap)) newMap[catId] = [];
         } catch (err) {
@@ -179,10 +170,7 @@ const SectionForm = () => {
     setSubcategoriesByCategory((prev) => {
       const updated = { ...prev };
       Object.keys(updated).forEach((key) => {
-        if (!categoryIds.includes(key)) {
-          console.log(`[SUBCATS] Removing category ${key} (no longer selected)`);
-          delete updated[key];
-        }
+        if (!categoryIds.includes(key)) delete updated[key];
       });
       return updated;
     });
@@ -205,7 +193,6 @@ const SectionForm = () => {
         queryParams.search = debouncedProductSearchTerm.trim();
       }
       const res = await searchItems(queryParams);
-      console.log(`[PRODUCTS] page=${page}, search="${debouncedProductSearchTerm}" →`, res?.data);
 
       let prodArray = [];
       let pag = null;
@@ -243,21 +230,7 @@ const SectionForm = () => {
       setLoading(true);
       try {
         const res = await getSingleSection(id);
-        console.log("[EDIT] Single section response:", res?.data);
-
         const sec = res?.data?.data || res?.data || res || {};
-
-        console.log("[EDIT] Parsed section:", {
-          title: sec.title,
-          type: sec.type,
-          categoryIds: sec.categoryId || sec.categoryIds,
-          subcategoryIds: sec.subcategoryId || sec.subcategoryIds,
-          productIds: sec.productIds || sec.itemIds || sec.products?.map?.(p => p.itemId || p._id),
-          discount: sec.discount,
-          navigation: sec.navigation,
-          desktopBanner: sec.desktopBanner?.[0]?.imageUrl || sec.desktopBanner?.[0]?.url,
-          mobileBanner: sec.mobileBanner?.[0]?.imageUrl || sec.mobileBanner?.[0]?.url,
-        });
 
         setTitle(sec.title || "");
         setType(sec.type || "MANUAL");
@@ -270,7 +243,6 @@ const SectionForm = () => {
         const subIds = sec.subcategoryId || sec.subcategoryIds || [];
         const flatSubIds = Array.isArray(subIds) ? subIds : subIds ? [subIds] : [];
 
-        // Note: this is a simplification — you might want to improve this logic later
         if (flatSubIds.length > 0 && loadedCatIds.length > 0) {
           setSubcategoryMap({ [loadedCatIds[0]]: flatSubIds });
         }
@@ -289,7 +261,7 @@ const SectionForm = () => {
         setNavigatePath(sec.navigation?.navigate || sec.navigation?.path || "");
 
         const deskUrl = sec.desktopBanner?.[0]?.imageUrl || sec.desktopBanner?.[0]?.url || null;
-        const mobUrl  = sec.mobileBanner?.[0]?.imageUrl  || sec.mobileBanner?.[0]?.url  || null;
+        const mobUrl = sec.mobileBanner?.[0]?.imageUrl || sec.mobileBanner?.[0]?.url || null;
         setDesktopPreview(deskUrl);
         setMobilePreview(mobUrl);
       } catch (err) {
@@ -317,7 +289,6 @@ const SectionForm = () => {
       const updated = list.includes(subId)
         ? list.filter((s) => s !== subId)
         : [...list, subId];
-      console.log(`[SUBCAT] ${catId} toggled ${subId} → now:`, updated);
       return {
         ...prev,
         [catId]: updated,
@@ -326,74 +297,64 @@ const SectionForm = () => {
   };
 
   // ─── Submit ──────────────────────────────────────────────────
- // ─── Submit ──────────────────────────────────────────────────
-// ─── Submit ──────────────────────────────────────────────────
-const handleSubmit = async (e) => {
-  e.preventDefault();
+  const handleSubmit = async (e) => {
+    e.preventDefault();
 
-  try {
-    setLoading(true);
+    try {
+      setLoading(true);
 
-    const formData = new FormData();
+      const formData = new FormData();
 
-    // ─── Basic fields ───
-    formData.append("title", title);
-    formData.append("type", type);
-    formData.append("text", text || "");
+      formData.append("title", title);
+      formData.append("type", type);
+      formData.append("text", text || "");
 
-    // ─── Categories (array of ObjectIds) ───
-    categoryIds.forEach((id) => {
-      formData.append("categoryId", id);
-    });
+      categoryIds.forEach((id) => {
+        formData.append("categoryId", id);
+      });
 
-    // ─── Subcategories (flatten the map) ───
-    const flatSubcategories = Object.values(subcategoryMap).flat();
+      const flatSubcategories = Object.values(subcategoryMap).flat();
+      flatSubcategories.forEach((subId) => {
+        formData.append("subcategoryId", subId);
+      });
 
-    flatSubcategories.forEach((subId) => {
-      formData.append("subcategoryId", subId);
-    });
+      productIds.forEach((prodId, index) => {
+        formData.append(`products[${index}][itemId]`, prodId);
+      });
 
-    // ─── Products (array of objects) ───
-    productIds.forEach((prodId, index) => {
-      formData.append(`products[${index}][itemId]`, prodId);
-    });
+      if (discountValue > 0) {
+        formData.append("discount[type]", discountType);
+        formData.append("discount[value]", discountValue);
+      }
 
-    // ─── Section Discount ───
-    if (discountValue > 0) {
-      formData.append("discount[type]", discountType);
-      formData.append("discount[value]", discountValue);
+      formData.append("navigation[externalLink]", externalLink || "");
+      formData.append("navigation[navigate]", navigatePath || "");
+
+      if (desktopBanner) {
+        formData.append("desktopBanner", desktopBanner);
+      }
+
+      if (mobileBanner) {
+        formData.append("mobileBanner", mobileBanner);
+      }
+
+      let res;
+      if (id) {
+        res = await updateSection(id, formData);
+      } else {
+        res = await createSection(formData);
+      }
+
+      alert(id ? "Section updated successfully!" : "Section created successfully!");
+      navigate("/admin/sections");
+    } catch (err) {
+      console.error("Submit failed:", err);
+      alert(err?.response?.data?.message || "Failed to save section");
+    } finally {
+      setLoading(false);
     }
+  };
 
-    // ─── Navigation ───
-    formData.append("navigation[externalLink]", externalLink || "");
-    formData.append("navigation[navigate]", navigatePath || "");
-
-    // ─── Banners ───
-    if (desktopBanner) {
-      formData.append("desktopBanner", desktopBanner);
-    }
-
-    if (mobileBanner) {
-      formData.append("mobileBanner", mobileBanner);
-    }
-
-    let res;
-
-    if (id) {
-      res = await updateSection(id, formData);
-    } else {
-      res = await createSection(formData);
-    }
-
-    alert(id ? "Section updated successfully!" : "Section created successfully!");
-    navigate("/admin/sections");
-  } catch (err) {
-    console.error("Submit failed:", err);
-    alert(err?.response?.data?.message || "Failed to save section");
-  } finally {
-    setLoading(false);
-  }
-};;
   // ─── RENDER ──────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 p-6 md:p-8">
@@ -452,7 +413,6 @@ const handleSubmit = async (e) => {
                       onChange={(e) => {
                         const newType = e.target.value;
                         setType(newType);
-                        console.log("[TYPE] Changed to:", newType);
                         if (newType !== "CATEGORY") {
                           setCategoryIds([]);
                           setSubcategoryMap({});
@@ -792,6 +752,72 @@ const handleSubmit = async (e) => {
                       )}
                     </div>
 
+                    {/* ── Selected Products Tags ── */}
+                    {productIds.length > 0 && (
+                      <div className="mt-6 pt-5 border-t">
+                        <div className="flex items-center justify-between mb-3">
+                          <p className="text-sm font-semibold flex items-center gap-2">
+                            <Package size={16} className="text-purple-600" />
+                            Currently selected products ({productIds.length})
+                          </p>
+                          {productIds.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => setProductIds([])}
+                              className="text-xs text-red-600 hover:text-red-800 underline"
+                            >
+                              Clear all
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="flex flex-wrap gap-2 max-h-40 overflow-y-auto p-3 bg-gray-50 rounded-lg border border-gray-200">
+                          {productIds.map((id) => {
+                            const product = products.find((p) => p._id === id);
+                            if (!product) {
+                              // Product might be from previous page or edit load
+                              return (
+                                <div
+                                  key={id}
+                                  className="flex items-center gap-2 bg-gray-100 border border-gray-300 rounded-full px-3 py-1.5 text-sm text-gray-600 italic"
+                                >
+                                  <span>ID: {id.slice(-8)}...</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => setProductIds((prev) => prev.filter((pid) => pid !== id))}
+                                    className="text-red-500 hover:text-red-700 text-lg leading-none"
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              );
+                            }
+
+                            return (
+                              <div
+                                key={id}
+                                className="flex items-center gap-2 bg-white border border-gray-300 rounded-full px-3 py-1.5 text-sm shadow-sm"
+                              >
+                                <span className="font-medium truncate max-w-[240px]">
+                                  {product.name || product.title || "Unnamed Product"}
+                                </span>
+                                {product.discountedPrice && (
+                                  <span className="text-green-600 text-xs">₹{product.discountedPrice}</span>
+                                )}
+                                <button
+                                  type="button"
+                                  onClick={() => setProductIds((prev) => prev.filter((pid) => pid !== id))}
+                                  className="text-red-500 hover:text-red-700 ml-1 text-lg leading-none"
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
                     {type === "MANUAL" && productIds.length === 0 && (
                       <p className="text-red-600 text-sm bg-red-50 p-3 rounded">
                         At least one product is required for MANUAL type
@@ -923,7 +949,6 @@ const handleSubmit = async (e) => {
                           if (file) {
                             setDesktopBanner(file);
                             setDesktopPreview(URL.createObjectURL(file));
-                            console.log("[BANNER] Desktop selected:", file.name);
                           }
                         }}
                         className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:bg-black file:text-white hover:file:bg-gray-800"
@@ -940,7 +965,6 @@ const handleSubmit = async (e) => {
                             onClick={() => {
                               setDesktopBanner(null);
                               setDesktopPreview(null);
-                              console.log("[BANNER] Desktop removed");
                             }}
                             className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100"
                           >
@@ -960,7 +984,6 @@ const handleSubmit = async (e) => {
                           if (file) {
                             setMobileBanner(file);
                             setMobilePreview(URL.createObjectURL(file));
-                            console.log("[BANNER] Mobile selected:", file.name);
                           }
                         }}
                         className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:bg-black file:text-white hover:file:bg-gray-800"
@@ -977,7 +1000,6 @@ const handleSubmit = async (e) => {
                             onClick={() => {
                               setMobileBanner(null);
                               setMobilePreview(null);
-                              console.log("[BANNER] Mobile removed");
                             }}
                             className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full opacity-0 group-hover:opacity-100"
                           >

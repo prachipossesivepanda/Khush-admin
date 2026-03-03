@@ -1,163 +1,190 @@
-// src/pages/Review.jsx
-import { useEffect, useState } from "react";
-import { getItemsWithSkus } from "../../apis/Reviewapi";
-import { getReviews } from "../../apis/Reviewapi";
+// src/components/Review.jsx
+import React, { useEffect, useState } from "react";
+import { getItemsWithSkus, getReviews } from "../../apis/Reviewapi";
+import { Star, ChevronLeft, ChevronRight, Search } from "lucide-react";
 
 export default function Review() {
   const [items, setItems] = useState([]);
-  const [selectedItem, setSelectedItem] = useState("");
-  const [reviews, setReviews] = useState([]);
-  const [loadingItems, setLoadingItems] = useState(false);
-  const [loadingReviews, setLoadingReviews] = useState(false);
-  const [page, setPage] = useState(1);
-  const [pagination, setPagination] = useState({});
+  const [reviews, setReviews] = useState({});
+  const [loadingItems, setLoadingItems] = useState(true);
+  const [loadingReviews, setLoadingReviews] = useState({});
+  const [error, setError] = useState(null);
 
-  // ================================
-  // 🔹 FETCH ITEMS
-  // ================================
- const fetchItems = async () => {
-  try {
-    setLoadingItems(true);
-    const res = await getItemsWithSkus(1, 20);
-    
-    // Add this temporary debug line (remove later)
-    console.log("API full response:", res);
-    console.log("Items array:", res?.data?.items);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalItems, setTotalItems] = useState(0);
+  const ITEMS_PER_PAGE = 10;
 
-    setItems(res?.data?.items ?? []);
-  } catch (err) {
-    console.error("Error fetching items:", err);
-  } finally {
-    setLoadingItems(false);
-  }
-};
-
-  // ================================
-  // 🔹 FETCH REVIEWS
-  // ================================
-  const fetchReviews = async () => {
-    if (!selectedItem) return;
-
+  // ===============================
+  // 🔹 Fetch Items with pagination & search
+  // ===============================
+  const fetchItems = async (page = 1) => {
     try {
-      setLoadingReviews(true);
-      const res = await getReviews(selectedItem, page, 4);
-      setReviews(res?.data?.data?.reviews || []);
-      setPagination(res?.data?.data?.pagination || {});
+      console.log("Fetching items...", { page, searchTerm });
+      setLoadingItems(true);
+
+      const res = await getItemsWithSkus(page, ITEMS_PER_PAGE);
+      console.log("Items response:", res);
+
+      if (res?.data?.items) {
+        setItems(res.data.items);
+        setTotalItems(res.data.total || res.data.items.length); // fallback if total not returned
+        console.log("Items set in state:", res.data.items);
+      }
     } catch (err) {
-      console.error("Error fetching reviews:", err);
+      console.error("Error fetching items:", err);
+      setError("Failed to fetch items");
     } finally {
-      setLoadingReviews(false);
+      setLoadingItems(false);
     }
   };
 
-  useEffect(() => {
-    fetchItems();
-  }, []);
+  // ===============================
+  // 🔹 Fetch Reviews for a specific item
+  // ===============================
+  const fetchReviews = async (itemId) => {
+    if (!itemId) return console.warn("Item ID missing for fetching reviews!");
+    try {
+      console.log(`Fetching reviews for itemId: ${itemId}...`);
+      setLoadingReviews((prev) => ({ ...prev, [itemId]: true }));
 
-  useEffect(() => {
-    fetchReviews();
-  }, [selectedItem, page]);
+      const res = await getReviews(itemId);
+      console.log(`Reviews response for ${itemId}:`, res);
 
-  // ⭐ Stars
-  const renderStars = (rating) =>
-    [...Array(5)].map((_, i) => (
-      <span key={i} className={i < rating ? "text-yellow-500" : "text-gray-300"}>
-        ★
-      </span>
+      if (res?.data?.reviews) {
+        setReviews((prev) => ({ ...prev, [itemId]: res.data.reviews }));
+        console.log(`Reviews set for itemId ${itemId}:`, res.data.reviews);
+      }
+    } catch (err) {
+      console.error(`Error fetching reviews for ${itemId}:`, err);
+    } finally {
+      setLoadingReviews((prev) => ({ ...prev, [itemId]: false }));
+    }
+  };
+
+  // ===============================
+  // 🔹 Fetch items when component mounts or page changes
+  // ===============================
+  useEffect(() => {
+    fetchItems(currentPage);
+  }, [currentPage]);
+
+  // ===============================
+  // 🔹 Fetch reviews for visible items
+  // ===============================
+  useEffect(() => {
+    if (items.length > 0) {
+      items.forEach((item) => fetchReviews(item._id));
+    }
+  }, [items]);
+
+  // ===============================
+  // 🔹 Filtered items by search term
+  // ===============================
+  const filteredItems = items.filter(
+    (item) =>
+      item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.sku.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // ===============================
+  // 🔹 Render Stars
+  // ===============================
+  const renderStars = (rating) => {
+    return [...Array(5)].map((_, i) => (
+      <Star
+        key={i}
+        className={`w-4 h-4 ${i < rating ? "text-yellow-400" : "text-gray-300"}`}
+      />
     ));
+  };
+
+  // ===============================
+  // 🔹 Pagination controls
+  // ===============================
+  const totalPages = Math.ceil(totalItems / ITEMS_PER_PAGE);
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
-      <div className="max-w-5xl mx-auto bg-white p-6 rounded-2xl shadow-lg">
-        <h1 className="text-2xl font-bold mb-6 text-gray-800">
-          Item Reviews Dashboard
-        </h1>
+      <h1 className="text-2xl font-bold mb-6">Item Reviews</h1>
 
-        {/* ITEM SELECT */}
-        <div className="mb-6">
-          <label className="block mb-2 font-medium text-gray-700">
-            Select Item ID
-          </label>
-
-          {loadingItems ? (
-            <p>Loading items...</p>
-          ) : (
-            <select
-              value={selectedItem}
-              onChange={(e) => {
-                setSelectedItem(e.target.value);
-                setPage(1);
-              }}
-              className="w-full border rounded-lg p-2"
-            >
-              <option value="">-- Select Item --</option>
-              {items.map((item) => (
-                <option key={item.itemId} value={item.itemId}>
-                  {item.itemId} ({item.skuIds.length} SKUs)
-                </option>
-              ))}
-            </select>
-          )}
-        </div>
-
-        {/* REVIEWS */}
-        {selectedItem && (
-          <>
-            <h2 className="text-xl font-semibold mb-4 text-blue-600">
-              Reviews for Item: {selectedItem}
-            </h2>
-
-            {loadingReviews ? (
-              <p>Loading reviews...</p>
-            ) : reviews.length === 0 ? (
-              <p>No reviews found.</p>
-            ) : (
-              <div className="space-y-4">
-                {reviews.map((r) => (
-                  <div
-                    key={r._id}
-                    className="border rounded-xl p-4 hover:shadow-md transition"
-                  >
-                    <div className="flex justify-between mb-2">
-                      <span className="font-semibold">{r.name}</span>
-                      <span>{renderStars(r.rating)}</span>
-                    </div>
-                    <p className="text-gray-600">{r.description}</p>
-                    <p className="text-xs text-gray-400 mt-2">
-                      {new Date(r.createdAt).toLocaleString()}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            )}
-
-            {/* Pagination */}
-            {pagination.totalPages > 1 && (
-              <div className="flex justify-center gap-4 mt-6">
-                <button
-                  disabled={page === 1}
-                  onClick={() => setPage(page - 1)}
-                  className="px-4 py-2 bg-gray-200 rounded-lg"
-                >
-                  Prev
-                </button>
-
-                <span>
-                  Page {pagination.page} / {pagination.totalPages}
-                </span>
-
-                <button
-                  disabled={page === pagination.totalPages}
-                  onClick={() => setPage(page + 1)}
-                  className="px-4 py-2 bg-gray-200 rounded-lg"
-                >
-                  Next
-                </button>
-              </div>
-            )}
-          </>
-        )}
+      {/* Search Bar */}
+      <div className="mb-4 flex items-center space-x-2">
+        <Search className="w-5 h-5 text-gray-400" />
+        <input
+          type="text"
+          placeholder="Search items by name or SKU..."
+          className="w-full p-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-400"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
       </div>
+
+      {loadingItems ? (
+        <p>Loading items...</p>
+      ) : error ? (
+        <p className="text-red-500">{error}</p>
+      ) : filteredItems.length === 0 ? (
+        <p>No items found.</p>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredItems.map((item) => (
+              <div
+                key={item._id}
+                className="bg-white shadow-md rounded-lg p-4 hover:shadow-lg transition"
+              >
+                <h2 className="font-semibold text-lg">{item.name}</h2>
+                <p className="text-sm text-gray-500 mb-2">{item.sku}</p>
+
+                {loadingReviews[item._id] ? (
+                  <p>Loading reviews...</p>
+                ) : reviews[item._id]?.length > 0 ? (
+                  reviews[item._id].map((review) => (
+                    <div
+                      key={review._id}
+                      className="border-t pt-2 mt-2 border-gray-200"
+                    >
+                      <div className="flex items-center mb-1">
+                        {renderStars(review.rating)}
+                        <span className="ml-2 text-sm text-gray-600">
+                          {review.user}
+                        </span>
+                      </div>
+                      <p className="text-sm text-gray-700">{review.comment}</p>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-gray-400">No reviews yet.</p>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Pagination */}
+          <div className="flex justify-center items-center mt-6 space-x-4">
+            <button
+              onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+              className="flex items-center px-3 py-1 bg-blue-500 text-white rounded disabled:opacity-50"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              Prev
+            </button>
+            <span>
+              Page {currentPage} of {totalPages}
+            </span>
+            <button
+              onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
+              disabled={currentPage === totalPages}
+              className="flex items-center px-3 py-1 bg-blue-500 text-white rounded disabled:opacity-50"
+            >
+              Next
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
