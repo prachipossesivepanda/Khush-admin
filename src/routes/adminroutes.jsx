@@ -45,12 +45,14 @@ import InfluencerCoupons from "../admin/components/influencer/influencercoupon";
 import InfluencerCouponsForm from "../admin/components/influencer/influencercouponform";
 import CouponAnalytics from "../admin/components/coupon/CouponAnayltics";
 import InfluencerCouponManage from "../admin/components/influencer/influencercouponmanagement";
-import ExchangeForm from "../admin/components/exchange/exchnagePolicyform";
-import Exchanges from "../admin/components/exchange/exchangePolicy";
+import ExchangeForm from "../admin/components/Policy/exchnagePolicyform";
+import Exchanges from "../admin/components/Policy/exchangePolicy";
 import Status from "../admin/components/Status/Status";
 import StatusPage from "../admin/components/Status/Statusform";
 import Orders from "../admin/components/orders/order";
 import Reviews from "../admin/components/Review/Reviews";
+import Cancellation from "../admin/components/Policy/cancellationPolicy";
+import CancellationForm from "../admin/components/Policy/cancellationform";
 const AdminRoutes = () => {
   return (
     <Routes>
@@ -138,7 +140,9 @@ const AdminRoutes = () => {
         <Route path="exchange" element={<Exchanges/>}/>
         <Route path="exchange/create" element={<ExchangeForm/>}/>
         <Route path="exchange/edit/:id" element={<ExchangeForm/>}/>
-
+        <Route path="cancellation" element={<Cancellation/>}/>
+        <Route path ="cancellation/create" element={<CancellationForm/>}/>
+        <Route path="cancellation/edit/:id" element={<CancellationForm/>}/>
 
         <Route path="warehouse" element={<Warehouse />} />
         <Route path="warehouse/create" element={<WarehouseForm />} />
