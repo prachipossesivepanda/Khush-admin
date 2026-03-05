@@ -7,6 +7,7 @@ import Dashboard from "../admin/components/Dashboard/Dashboard";
 import Categories from "../admin/components/inventory/category";
 import Subcategories from "../admin/components/inventory/Subcategory";
 import Items from "../admin/components/inventory/item";
+import Stockmanagement from "../admin/components/inventory/Stockmanagement";
 import ItemDetails from "../admin/components/inventory/Itemdetails";
 import Banner from "../admin/components/Banner/Banner";
 import Brand from "../admin/components/Brands/Brands";
@@ -78,6 +79,7 @@ const AdminRoutes = () => {
         <Route path="inventory/items/:categoryId/:subcategoryId/create" element={<ItemForm />} />
         <Route path="inventory/items/:categoryId/:subcategoryId/edit/:id" element={<ItemForm />} />
         <Route path="inventory/items/:itemId" element={<ItemDetails />} />
+        <Route path="inventory/stock-management" element={<Stockmanagement />} />
 
         <Route path="banners" element={<Banner />} />
         <Route path="banners/create" element={<BannerForm />} />
@@ -137,9 +139,11 @@ const AdminRoutes = () => {
         <Route path="exchange/create" element={<ExchangeForm/>}/>
         <Route path="exchange/edit/:id" element={<ExchangeForm/>}/>
 
+
         <Route path="warehouse" element={<Warehouse />} />
         <Route path="warehouse/create" element={<WarehouseForm />} />
         <Route path="warehouse/edit/:id" element={<WarehouseForm />} />
+        <Route path="stocks" element={<Stockmanagement/>}/>
         <Route path="influencer/coupons" element={<InfluencerCoupons />} />
         <Route path="influencer/coupons/create" element={<InfluencerCouponsForm />} />
         <Route path="influencer/coupons/edit/:id" element={<InfluencerCouponsForm />} />
