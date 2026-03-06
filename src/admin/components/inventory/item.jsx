@@ -95,7 +95,7 @@ export default function Items() {
       </div>
 
       {/* Sticky Controls Section */}
-      <div className="sticky top-[88px] z-40 backdrop-blur">
+      <div className="sticky top-[88px] z-40 ">
         <div className="px-8 py-6">
           <div className="flex flex-col sm:flex-row items-center gap-4">
 

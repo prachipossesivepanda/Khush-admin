@@ -186,13 +186,13 @@ const Delivery = () => {
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
             Delivery Management
           </h1>
-          <button
+          {/* <button
             onClick={resetForm}
             className="inline-flex items-center px-5 py-2.5 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition font-medium shadow-sm"
           >
             <Plus className="w-5 h-5 mr-2" />
             Add Delivery Option
-          </button>
+          </button> */}
         </div>
 
         {/* Form Card */}

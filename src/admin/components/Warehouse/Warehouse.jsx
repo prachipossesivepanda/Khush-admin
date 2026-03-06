@@ -43,7 +43,7 @@ export default function Warehouse() {
   const [stockPage, setStockPage] = useState(1);
   const STOCK_LIMIT = 10;
 
-  // Debounce search for main warehouses list
+  // Debounce search
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearchTerm(searchTerm);
@@ -61,75 +61,109 @@ export default function Warehouse() {
 
   const fetchWarehouses = async () => {
     setLoading(true);
+    console.log("[FETCH] Requesting page", currentPage, "search:", debouncedSearchTerm);
+
     try {
       const response = await getWarehouses(currentPage, limit, debouncedSearchTerm);
+      console.log("[FETCH] Raw response:", response);
+
       const data = response?.data?.data || response?.data || {};
       const warehouseList = data.warehouses || data.items || data || [];
 
-      const formatted = warehouseList.map((wh, idx) => {
-        const addr = wh.address || {};
-        return {
-          id: wh._id || wh.id || `temp-${idx}`,
-          name: wh.name || "",
-          address: addr.line
-            ? `${addr.line}, ${addr.city}, ${addr.state} - ${addr.pinCode}, ${addr.country}`
-            : "—",
-          city: addr.city || "—",
-          state: addr.state || "—",
-          pincode: addr.pinCode || "—",
-          phone: wh.phone || "—",
-          email: wh.email || "",
-          isActive: wh.isActive !== false,
-          createdAt: wh.createdAt || "",
-        };
-      });
+      const formatted = warehouseList.map((wh, idx) => ({
+        id: wh._id || wh.id || `temp-${idx}`,
+        name: wh.name || "",
+        address: wh.address?.line
+          ? `${wh.address.line}, ${wh.address.city}, ${wh.address.state} - ${wh.address.pinCode}, ${wh.address.country || ""}`
+          : "—",
+        city: wh.address?.city || "—",
+        state: wh.address?.state || "—",
+        pincode: wh.address?.pinCode || "—",
+        phone: wh.phone || "—",
+        email: wh.email || "",
+        isActive: wh.isActive !== false,
+        createdAt: wh.createdAt || "",
+      }));
 
+      console.log("[FETCH] Loaded", formatted.length, "warehouses");
       setWarehouses(formatted);
       setTotalPages(data.totalPages || data.pages || 1);
       setError(null);
     } catch (err) {
+      console.error("[FETCH] Error:", err);
       setError("Failed to load warehouses");
-      console.error("Fetch warehouses error:", err);
     } finally {
       setLoading(false);
     }
   };
 
-  const filteredWarehouses = warehouses.filter(
-    (wh) =>
-      wh.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      wh.city.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      wh.state.toLowerCase().includes(searchTerm.toLowerCase())
+  // ────────────────────────────────────────────────
+  //  Client-side filtering (this was missing → caused the error)
+  // ────────────────────────────────────────────────
+  const filteredWarehouses = warehouses.filter((wh) =>
+    (wh.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (wh.city || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (wh.state || "").toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const handleToggleActive = async (warehouse) => {
-    const original = { ...warehouse };
+    console.log("[TOGGLE] Clicked warehouse:", warehouse.name, "ID:", warehouse.id, "Current status:", warehouse.isActive);
+
+    if (!warehouse?.id) {
+      console.warn("[TOGGLE] Missing ID");
+      alert("Cannot toggle — warehouse ID missing");
+      return;
+    }
+
+    const originalIsActive = warehouse.isActive;
+    const desiredIsActive = !originalIsActive;
+
+    // Optimistic update
     setWarehouses((prev) =>
       prev.map((wh) =>
-        wh.id === warehouse.id ? { ...wh, isActive: !wh.isActive } : wh
+        wh.id === warehouse.id ? { ...wh, isActive: desiredIsActive } : wh
       )
     );
 
     try {
-      await toggleWarehouseStatus(warehouse.id);
-      fetchWarehouses();
+      console.log("[TOGGLE] Calling API →", warehouse.id);
+      const response = await toggleWarehouseStatus(warehouse.id);
+      console.log("[TOGGLE] API success → response:", response);
+
+      // Re-fetch to sync with backend (safest)
+      await fetchWarehouses();
     } catch (err) {
+      console.error("[TOGGLE] API failed:", err);
+      console.error("[TOGGLE] Full error:", err?.response?.data || err.message || err);
+
+      // Rollback
       setWarehouses((prev) =>
         prev.map((wh) =>
-          wh.id === warehouse.id ? { ...wh, isActive: original.isActive } : wh
+          wh.id === warehouse.id ? { ...wh, isActive: originalIsActive } : wh
         )
       );
-      alert(err.response?.data?.message || "Failed to update status");
+
+      const errorMessage =
+        err?.response?.data?.message ||
+        err?.response?.data?.error ||
+        err.message ||
+        "Failed to update warehouse status";
+
+      alert(errorMessage);
     }
   };
 
   const handleDelete = async (warehouseId) => {
     if (!window.confirm("Are you sure you want to delete this warehouse?")) return;
+
     try {
+      console.log("[DELETE] Deleting ID:", warehouseId);
       await deleteWarehouse(warehouseId);
-      fetchWarehouses();
+      console.log("[DELETE] Success");
+      await fetchWarehouses();
     } catch (err) {
-      alert(err.response?.data?.message || "Failed to delete warehouse");
+      console.error("[DELETE] Failed:", err);
+      alert(err?.response?.data?.message || "Failed to delete warehouse");
     }
   };
 
@@ -171,24 +205,15 @@ export default function Warehouse() {
       await addWarehousePincodes(selectedWarehouse.id, payload);
       setNewPincode("");
 
-      // Refresh list
       const response = await getWarehousePincodes(selectedWarehouse.id);
-      const pincodeList = response?.data || (Array.isArray(response) ? response : []);
-      setPincodes(pincodeList);
+      setPincodes(response?.data || (Array.isArray(response) ? response : []));
     } catch (err) {
-      const msg =
-        typeof err === "string"
-          ? err
-          : err.response?.data?.message || "Failed to add pincode";
+      const msg = err.response?.data?.message || "Failed to add pincode";
       alert(msg);
 
-      // Still refresh on duplicate error
       if (msg.toLowerCase().includes("already") || msg.toLowerCase().includes("duplicate")) {
-        try {
-          const response = await getWarehousePincodes(selectedWarehouse.id);
-          const pincodeList = response?.data || [];
-          setPincodes(pincodeList);
-        } catch {}
+        const response = await getWarehousePincodes(selectedWarehouse.id);
+        setPincodes(response?.data || []);
       }
     }
   };
@@ -199,8 +224,7 @@ export default function Warehouse() {
     try {
       await deleteWarehousePincode(selectedWarehouse.id, pincodeId);
       const response = await getWarehousePincodes(selectedWarehouse.id);
-      const pincodeList = response?.data || [];
-      setPincodes(pincodeList);
+      setPincodes(response?.data || []);
     } catch (err) {
       alert(err.response?.data?.message || "Failed to delete pincode");
     }
@@ -232,7 +256,7 @@ export default function Warehouse() {
     setStockPage(1);
 
     try {
-      const response = await getWarehouseStock(warehouse.id, 1, 500); // larger limit for client-side paging
+      const response = await getWarehouseStock(warehouse.id, 1, 500);
       const data = response?.data?.data || response?.data || {};
       setStock(data.stock || data.items || data || []);
     } catch (err) {
@@ -256,7 +280,6 @@ export default function Warehouse() {
       });
       setStockForm({ sku: "", quantity: "" });
 
-      // Refresh
       const response = await getWarehouseStock(selectedWarehouse.id, 1, 500);
       const data = response?.data?.data || response?.data || {};
       setStock(data.stock || data.items || data || []);
@@ -314,7 +337,7 @@ export default function Warehouse() {
         {/* Main Table */}
         <div className="overflow-hidden rounded-lg border border-gray-200 shadow-sm">
           <div className="w-full table-fixed">
-            <table className="w-full  divide-y divide-gray-200">
+            <table className="w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-2 py-3 text-left text-xs font-semibold text-gray-600">#</th>
@@ -441,9 +464,7 @@ export default function Warehouse() {
         )}
       </div>
 
-      {/* ────────────────────────────────────────────────
-           PINCODE MODAL
-      ──────────────────────────────────────────────── */}
+      {/* Pincode Modal */}
       {showPincodeModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -467,7 +488,6 @@ export default function Warehouse() {
             </div>
 
             <div className="p-6 space-y-6">
-              {/* Add new pincode */}
               <div className="flex gap-3">
                 <input
                   type="text"
@@ -485,7 +505,6 @@ export default function Warehouse() {
                 </button>
               </div>
 
-              {/* Search + List + Pagination */}
               <div className="space-y-4">
                 <input
                   type="text"
@@ -591,9 +610,7 @@ export default function Warehouse() {
         </div>
       )}
 
-      {/* ────────────────────────────────────────────────
-           STOCK MODAL
-      ──────────────────────────────────────────────── */}
+      {/* Stock Modal */}
       {showStockModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
@@ -617,7 +634,6 @@ export default function Warehouse() {
             </div>
 
             <div className="p-6 space-y-6">
-              {/* Add / Update stock form */}
               <div className="bg-gray-50 p-5 rounded-xl space-y-4">
                 <h3 className="font-semibold text-gray-700">Update Stock</h3>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -645,7 +661,6 @@ export default function Warehouse() {
                 </div>
               </div>
 
-              {/* Stock list + search + pagination */}
               <div className="space-y-4">
                 <input
                   type="text"

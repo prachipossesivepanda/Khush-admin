@@ -53,7 +53,7 @@ export const updateWarehouse = (id, data) => {
 // ✅ Toggle Warehouse Status
 export const toggleWarehouseStatus = (id) => {
   return apiConnector(
-    "PUT",
+    "PATCH",
     `${warehouseEndpoints.TOGGLE_WAREHOUSE_STATUS}/${id}`
   );
 };
