@@ -24,6 +24,19 @@ const orderEndpoints = {
   // Update Single Item Status inside Order
   UPDATE_ITEM_STATUS: (orderId, itemId) =>
     `/admin/orders/${orderId}/items/${itemId}/status`,
+
+  // Update whole order status (all items to same status)
+  UPDATE_WHOLE_ORDER_STATUS: (orderId) => `/admin/orders/${orderId}/status`,
+
+  // Delivery assignment (orderId + itemId flow before marking SHIPPED)
+  ASSIGNMENT_VIEW: (orderId) => `/admin/orders/${orderId}/assignment-view`,
+  ASSIGN_WHOLE_ORDER: (orderId) => `/admin/orders/${orderId}/assign`,
+  ASSIGN_ITEMS: (orderId) => `/admin/orders/${orderId}/assign-items`,
+  UNASSIGN: (orderId) => `/admin/orders/${orderId}/unassign`,
+
+  // Delivery agents list (for driver dropdown)
+  DELIVERY_AGENTS_LIST: (page = 1, limit = 100) =>
+    `/admin/panels/delivery-agent/list?page=${page}&limit=${limit}`,
 };
 
 // ✅ Get All Orders
@@ -49,4 +62,39 @@ export const updateOrderItemStatus = (orderId, itemId, data) => {
     orderEndpoints.UPDATE_ITEM_STATUS(orderId, itemId),
     data
   );
+};
+
+// ✅ Update whole order status (all items to same status)
+export const updateWholeOrderStatus = (orderId, data) => {
+  return apiConnector(
+    "PATCH",
+    orderEndpoints.UPDATE_WHOLE_ORDER_STATUS(orderId),
+    data
+  );
+};
+
+// ✅ Delivery assignment APIs (run before marking item as SHIPPED)
+export const getAssignmentView = (orderId) => {
+  return apiConnector("GET", orderEndpoints.ASSIGNMENT_VIEW(orderId));
+};
+
+export const assignWholeOrder = (orderId, deliveryAgentId) => {
+  return apiConnector("POST", orderEndpoints.ASSIGN_WHOLE_ORDER(orderId), {
+    deliveryAgentId,
+  });
+};
+
+export const assignItems = (orderId, deliveryAgentId, itemIds) => {
+  return apiConnector("POST", orderEndpoints.ASSIGN_ITEMS(orderId), {
+    deliveryAgentId,
+    itemIds,
+  });
+};
+
+export const unassignOrder = (orderId, body) => {
+  return apiConnector("POST", orderEndpoints.UNASSIGN(orderId), body);
+};
+
+export const listDeliveryAgents = (page = 1, limit = 100) => {
+  return apiConnector("GET", orderEndpoints.DELIVERY_AGENTS_LIST(page, limit));
 };

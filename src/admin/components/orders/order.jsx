@@ -4,6 +4,11 @@ import {
   getOrders,
   getSingleOrder,
   updateOrderItemStatus,
+  updateWholeOrderStatus,
+  getAssignmentView,
+  assignItems,
+  assignWholeOrder,
+  listDeliveryAgents,
 } from "../../apis/Orderapi";
 import {
   Search,
@@ -37,8 +42,27 @@ const Orders = () => {
   const [orderError, setOrderError] = useState(null);
 
   const [updatingItemId, setUpdatingItemId] = useState(null);
+  const [updatingWholeOrder, setUpdatingWholeOrder] = useState(false);
+  const [wholeOrderNewStatus, setWholeOrderNewStatus] = useState("");
   const [itemPage, setItemPage] = useState(1);
   const itemLimit = 8;
+
+  // Multi-select items for bulk status update
+  const [selectedItemIds, setSelectedItemIds] = useState([]);
+  const [bulkStatus, setBulkStatus] = useState("");
+  const [updatingBulk, setUpdatingBulk] = useState(false);
+
+  // Delivery assignment modal (before marking SHIPPED / OUT_FOR_DELIVERY)
+  const [assignmentModalOpen, setAssignmentModalOpen] = useState(false);
+  const [assignmentOrderId, setAssignmentOrderId] = useState(null);
+  const [assignmentMode, setAssignmentMode] = useState("whole"); // "whole" | "items"
+  const [assignmentItemIds, setAssignmentItemIds] = useState([]);
+  const [assignmentItemId, setAssignmentItemId] = useState(null); // kept for openAssignmentModal(param) compatibility
+  const [pendingNewStatus, setPendingNewStatus] = useState(null);
+  const [deliveryAgentsList, setDeliveryAgentsList] = useState([]);
+  const [selectedDeliveryAgentId, setSelectedDeliveryAgentId] = useState("");
+  const [assignLoading, setAssignLoading] = useState(false);
+  const [assignError, setAssignError] = useState(null);
 
   const fetchOrders = useCallback(async () => {
     try {
@@ -84,10 +108,210 @@ const Orders = () => {
     }
   };
 
+  const STATUS_REQUIRES_ASSIGNMENT = ["SHIPPED", "OUT_FOR_DELIVERY"];
+  const WHOLE_ORDER_SENTINEL = "WHOLE_ORDER";
+
+  const isItemAssigned = (assignments, itemId) => {
+    if (!Array.isArray(assignments) || !itemId) return false;
+    const idStr = String(itemId);
+    return assignments.some(
+      (a) =>
+        !["CANCELLED", "REJECTED", "DELIVERED"].includes(a.status) &&
+        (a.itemIds || []).some((id) => String(id?._id ?? id) === idStr)
+    );
+  };
+
+  const openAssignmentModal = (orderId, itemIdsOrWhole, newStatus) => {
+    setAssignmentOrderId(orderId);
+    setPendingNewStatus(newStatus);
+    setSelectedDeliveryAgentId("");
+    setAssignError(null);
+    if (itemIdsOrWhole === WHOLE_ORDER_SENTINEL) {
+      setAssignmentMode("whole");
+      setAssignmentItemIds([]);
+      setAssignmentItemId(WHOLE_ORDER_SENTINEL);
+    } else if (Array.isArray(itemIdsOrWhole)) {
+      setAssignmentMode("items");
+      setAssignmentItemIds(itemIdsOrWhole.map(String));
+      setAssignmentItemId(null);
+    } else {
+      setAssignmentMode("items");
+      setAssignmentItemIds([String(itemIdsOrWhole)]);
+      setAssignmentItemId(itemIdsOrWhole);
+    }
+    setAssignmentModalOpen(true);
+    listDeliveryAgents(1, 100)
+      .then((res) => {
+        const data = res?.data || res;
+        const list = data?.deliveryAgents ?? data?.data ?? [];
+        setDeliveryAgentsList(Array.isArray(list) ? list : []);
+      })
+      .catch(() => setDeliveryAgentsList([]));
+  };
+
+  const handleAssignmentSubmit = async () => {
+    if (!assignmentOrderId || !pendingNewStatus || !selectedDeliveryAgentId) {
+      setAssignError("Please select a delivery agent.");
+      return;
+    }
+    if (assignmentMode === "items" && assignmentItemIds.length === 0) {
+      setAssignError("No items to assign.");
+      return;
+    }
+    setAssignLoading(true);
+    setAssignError(null);
+    try {
+      if (assignmentMode === "whole") {
+        await assignWholeOrder(assignmentOrderId, selectedDeliveryAgentId);
+        await updateWholeOrderStatus(assignmentOrderId, { status: pendingNewStatus });
+      } else {
+        await assignItems(assignmentOrderId, selectedDeliveryAgentId, assignmentItemIds);
+        for (const itemId of assignmentItemIds) {
+          await updateOrderItemStatus(assignmentOrderId, itemId, { status: pendingNewStatus });
+        }
+      }
+      setAssignmentModalOpen(false);
+      setWholeOrderNewStatus("");
+      setSelectedItemIds([]);
+      setBulkStatus("");
+      fetchSingleOrder(assignmentOrderId);
+    } catch (err) {
+      const msg = typeof err === "string" ? err : err?.response?.data?.message || "Assign failed.";
+      setAssignError(msg);
+    } finally {
+      setAssignLoading(false);
+    }
+  };
+
+  const handleUpdateWholeOrderStatus = async () => {
+    if (!selectedOrder?.orderId || !wholeOrderNewStatus) return;
+    const label = statusOptions.find((o) => o.value === wholeOrderNewStatus)?.label || wholeOrderNewStatus;
+    const requiresAssignment = STATUS_REQUIRES_ASSIGNMENT.includes(wholeOrderNewStatus);
+
+    if (requiresAssignment) {
+      try {
+        const res = await getAssignmentView(selectedOrder.orderId);
+        const data = res?.data ?? res;
+        const orderFromView = data?.order;
+        const assignments = data?.assignments ?? [];
+        const orderItems = orderFromView?.items ?? selectedOrder?.items ?? [];
+        const allAssigned = orderItems.length > 0 && orderItems.every((item) =>
+          isItemAssigned(assignments, item.itemId ?? item._id)
+        );
+        if (!allAssigned) {
+          openAssignmentModal(selectedOrder.orderId, WHOLE_ORDER_SENTINEL, wholeOrderNewStatus);
+          return;
+        }
+      } catch (err) {
+        console.error("Assignment view failed:", err);
+        setOrderError(err?.response?.data?.message || "Could not check assignment.");
+        return;
+      }
+    }
+
+    if (!window.confirm(`Set all items in this order to "${label}"? (Terminal items like CANCELLED will be skipped.)`)) return;
+
+    setUpdatingWholeOrder(true);
+    setOrderError(null);
+    try {
+      await updateWholeOrderStatus(selectedOrder.orderId, { status: wholeOrderNewStatus });
+      setWholeOrderNewStatus("");
+      await fetchSingleOrder(selectedOrder.orderId);
+    } catch (err) {
+      const msg = err?.response?.data?.message || err?.message || "Failed to update whole order status.";
+      setOrderError(msg);
+    } finally {
+      setUpdatingWholeOrder(false);
+    }
+  };
+
+  const toggleItemSelection = (itemId) => {
+    const idStr = String(itemId);
+    setSelectedItemIds((prev) =>
+      prev.includes(idStr) ? prev.filter((id) => id !== idStr) : [...prev, idStr]
+    );
+  };
+
+  const selectAllOnPage = () => {
+    const pageIds = (selectedOrder?.items ?? []).map((it) => String(it.itemId || it._id));
+    setSelectedItemIds((prev) => {
+      const combined = [...new Set([...prev, ...pageIds])];
+      return combined.length === prev.length && pageIds.every((id) => prev.includes(id))
+        ? prev.filter((id) => !pageIds.includes(id))
+        : combined;
+    });
+  };
+
+  const handleUpdateSelectedItemsStatus = async () => {
+    if (!selectedOrder?.orderId || selectedItemIds.length === 0 || !bulkStatus) return;
+    const label = statusOptions.find((o) => o.value === bulkStatus)?.label || bulkStatus;
+    const requiresAssignment = STATUS_REQUIRES_ASSIGNMENT.includes(bulkStatus);
+
+    if (requiresAssignment) {
+      try {
+        const res = await getAssignmentView(selectedOrder.orderId);
+        const data = res?.data ?? res;
+        const assignments = data?.assignments ?? [];
+        const allAssigned = selectedItemIds.every((id) => isItemAssigned(assignments, id));
+        if (!allAssigned) {
+          openAssignmentModal(selectedOrder.orderId, selectedItemIds, bulkStatus);
+          return;
+        }
+      } catch (err) {
+        console.error("Assignment view failed:", err);
+        setOrderError(err?.response?.data?.message || "Could not check assignment.");
+        return;
+      }
+    }
+
+    if (!window.confirm(`Set ${selectedItemIds.length} selected item(s) to "${label}"?`)) return;
+
+    setUpdatingBulk(true);
+    setOrderError(null);
+    try {
+      for (const itemId of selectedItemIds) {
+        await updateOrderItemStatus(selectedOrder.orderId, itemId, { status: bulkStatus });
+      }
+      setSelectedItemIds([]);
+      setBulkStatus("");
+      await fetchSingleOrder(selectedOrder.orderId);
+    } catch (err) {
+      const msg = err?.response?.data?.message || err?.message || "Failed to update selected items.";
+      setOrderError(msg);
+    } finally {
+      setUpdatingBulk(false);
+    }
+  };
+
   const handleUpdateItemStatus = async (orderId, itemId, newStatus) => {
     if (!orderId || !itemId || !newStatus) return;
 
     const stringItemId = String(itemId);
+    const requiresAssignment = STATUS_REQUIRES_ASSIGNMENT.includes(newStatus);
+
+    if (requiresAssignment) {
+      try {
+        const res = await getAssignmentView(orderId);
+        const data = res?.data ?? res;
+        const assignments = data?.assignments ?? [];
+        if (!isItemAssigned(assignments, itemId)) {
+          const label = statusOptions.find((o) => o.value === newStatus)?.label || newStatus;
+          if (window.confirm(`This item is not assigned to a driver. Assign a driver first, then mark as "${label}". Open assignment?`)) {
+            openAssignmentModal(orderId, itemId, newStatus);
+          }
+          return;
+        }
+      } catch (err) {
+        console.error("Assignment view failed:", err);
+        const msg = typeof err === "string" ? err : err?.response?.data?.message || "Could not check assignment.";
+        alert(msg);
+        return;
+      }
+    } else {
+      const label = statusOptions.find((o) => o.value === newStatus)?.label || newStatus;
+      if (!window.confirm(`Update to "${label}"?`)) return;
+    }
+
     setUpdatingItemId(stringItemId);
 
     const prevItem = selectedOrder?.items?.find(
@@ -112,7 +336,7 @@ const Orders = () => {
       await updateOrderItemStatus(orderId, itemId, payload);
     } catch (err) {
       console.error("Status update failed:", err);
-      const msg = err?.response?.data?.message || "Failed to update item status.";
+      const msg = typeof err === "string" ? err : err?.response?.data?.message || "Failed to update item status.";
       alert(msg);
 
       if (prevStatus) {
@@ -348,16 +572,51 @@ const Orders = () => {
                 onClick={() => {
                   setSelectedOrder(null);
                   setOrderError(null);
+                  setSelectedItemIds([]);
+                  setBulkStatus("");
                 }}
                 className="mb-2 text-sm font-medium text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
               >
                 ← Back to orders
               </button>
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <h2 className="text-xl font-bold text-gray-900 sm:text-2xl">
                   Order #{selectedOrder.orderId}
                 </h2>
-                {getStatusBadge(selectedOrder.status || selectedOrder.orderStatus)}
+                <div className="flex flex-wrap items-center gap-3">
+                  {getStatusBadge(selectedOrder.status || selectedOrder.orderStatus)}
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-600 whitespace-nowrap">Update all items to:</span>
+                    <select
+                      value={wholeOrderNewStatus}
+                      onChange={(e) => setWholeOrderNewStatus(e.target.value)}
+                      disabled={updatingWholeOrder}
+                      className="rounded border border-gray-300 px-3 py-1.5 text-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:opacity-60"
+                    >
+                      <option value="">Select status</option>
+                      {statusOptions.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={handleUpdateWholeOrderStatus}
+                      disabled={updatingWholeOrder || !wholeOrderNewStatus}
+                      className="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-1.5"
+                    >
+                      {updatingWholeOrder ? (
+                        <>
+                          <RefreshCw size={14} className="animate-spin" />
+                          Updating…
+                        </>
+                      ) : (
+                        "Apply"
+                      )}
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -369,7 +628,44 @@ const Orders = () => {
             )}
 
             <div className="px-6 pb-8">
-              <h3 className="mb-4 text-lg font-semibold text-gray-800">Order Items</h3>
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <h3 className="text-lg font-semibold text-gray-800">Order Items</h3>
+                {selectedOrder?.items?.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-gray-600">
+                      {selectedItemIds.length > 0 ? `${selectedItemIds.length} selected` : "Select items for bulk update"}
+                    </span>
+                    <select
+                      value={bulkStatus}
+                      onChange={(e) => setBulkStatus(e.target.value)}
+                      disabled={updatingBulk || selectedItemIds.length === 0}
+                      className="rounded border border-gray-300 px-3 py-1.5 text-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:opacity-60"
+                    >
+                      <option value="">Update selected to…</option>
+                      {statusOptions.map((opt) => (
+                        <option key={opt.value} value={opt.value}>
+                          {opt.label}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={handleUpdateSelectedItemsStatus}
+                      disabled={updatingBulk || selectedItemIds.length === 0 || !bulkStatus}
+                      className="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-1.5"
+                    >
+                      {updatingBulk ? (
+                        <>
+                          <RefreshCw size={14} className="animate-spin" />
+                          Updating…
+                        </>
+                      ) : (
+                        "Update selected"
+                      )}
+                    </button>
+                  </div>
+                )}
+              </div>
 
               {orderLoading ? (
                 <div className="py-12 text-center text-gray-500">Loading items…</div>
@@ -380,6 +676,19 @@ const Orders = () => {
                   <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
                       <tr>
+                        <th className="px-4 py-3.5 text-left">
+                          <input
+                            type="checkbox"
+                            checked={
+                              selectedOrder.items.length > 0 &&
+                              selectedOrder.items.every((it) =>
+                                selectedItemIds.includes(String(it.itemId || it._id))
+                              )
+                            }
+                            onChange={selectAllOnPage}
+                            className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                          />
+                        </th>
                         <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Product</th>
                         <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Qty</th>
                         <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Price</th>
@@ -391,9 +700,18 @@ const Orders = () => {
                       {selectedOrder.items.map((item) => {
                         const itemId = String(item.itemId || item._id);
                         const isUpdating = updatingItemId === itemId;
+                        const isSelected = selectedItemIds.includes(itemId);
 
                         return (
-                          <tr key={itemId} className="hover:bg-gray-50/60">
+                          <tr key={itemId} className={`hover:bg-gray-50/60 ${isSelected ? "bg-indigo-50/50" : ""}`}>
+                            <td className="px-4 py-4">
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => toggleItemSelection(itemId)}
+                                className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                              />
+                            </td>
                             <td className="px-5 py-4">
                               <div className="flex items-center gap-3">
                                 {item.variant?.imageUrl && (
@@ -427,10 +745,7 @@ const Orders = () => {
                                   value={item.status || "CREATED"}
                                   onChange={(e) => {
                                     const newVal = e.target.value;
-                                    const label = statusOptions.find((o) => o.value === newVal)?.label || newVal;
-                                    if (window.confirm(`Update to "${label}"?`)) {
-                                      handleUpdateItemStatus(selectedOrder.orderId, itemId, newVal);
-                                    }
+                                    handleUpdateItemStatus(selectedOrder.orderId, itemId, newVal);
                                   }}
                                   disabled={isUpdating}
                                   className={`rounded border border-gray-300 px-3 py-1.5 text-sm focus:border-indigo-500 focus:ring-indigo-500 ${
@@ -486,6 +801,66 @@ const Orders = () => {
                   </button>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* Delivery assignment modal: assign driver before marking SHIPPED / OUT_FOR_DELIVERY */}
+        {assignmentModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Assign delivery driver</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                {assignmentMode === "whole"
+                  ? `Assign a driver to this order before marking as ${statusOptions.find((o) => o.value === pendingNewStatus)?.label || pendingNewStatus}.`
+                  : assignmentItemIds.length === 1
+                    ? `Assign a driver to this item before marking as ${statusOptions.find((o) => o.value === pendingNewStatus)?.label || pendingNewStatus}.`
+                    : `Assign a driver to these ${assignmentItemIds.length} items before marking as ${statusOptions.find((o) => o.value === pendingNewStatus)?.label || pendingNewStatus}.`}
+              </p>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Delivery agent</label>
+                <select
+                  value={selectedDeliveryAgentId}
+                  onChange={(e) => setSelectedDeliveryAgentId(e.target.value)}
+                  className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500"
+                >
+                  <option value="">Select driver</option>
+                  {deliveryAgentsList
+                    .filter((a) => a.isActive !== false)
+                    .map((agent) => (
+                      <option key={agent._id} value={agent._id}>
+                        {agent.name || "Driver"} {agent.phoneNumber ? ` – ${agent.phoneNumber}` : ""}
+                      </option>
+                    ))}
+                </select>
+              </div>
+              {assignError && (
+                <p className="text-sm text-red-600 mb-3">{assignError}</p>
+              )}
+              <div className="flex gap-3 justify-end">
+                <button
+                  type="button"
+                  onClick={() => !assignLoading && setAssignmentModalOpen(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleAssignmentSubmit}
+                  disabled={assignLoading || !selectedDeliveryAgentId}
+                  className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2"
+                >
+                  {assignLoading ? (
+                    <>
+                      <RefreshCw size={14} className="animate-spin" />
+                      Assigning…
+                    </>
+                  ) : (
+                    "Assign & update status"
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         )}
