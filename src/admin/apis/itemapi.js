@@ -1,6 +1,11 @@
 // src/apis/itemApi.js
 import { apiConnector } from '../services/Apiconnector';
 
+// Internal item endpoints used by this module
+const ITEMS_API = {
+  GET_ITEMS_WITH_SKUS: "/items/skus",
+};
+
 /**
  * Get all items with pagination and search (similar to getAllCategories pattern)
  * Endpoint: GET /api/items/getAll
@@ -158,6 +163,17 @@ export const getItemsForSelect = async (limit = 50, search = '') => {
   return searchItems({ limit, search });
 };
 
+
+export const getItemsWithSkus = (
+  page = 1,
+  limit = 10,
+  skuPage = 1,
+  skuLimit = 15
+) => {
+  const url = `${ITEMS_API.GET_ITEMS_WITH_SKUS}?page=${page}&limit=${limit}&skuPage=${skuPage}&skuLimit=${skuLimit}`;
+  return apiConnector("GET", url);
+};
+
 export default {
   searchItems,
   getItemsBySubcategory,
@@ -165,4 +181,5 @@ export default {
   createItem,
   updateItem,
   getItemsForSelect,
+  getItemsWithSkus,
 };

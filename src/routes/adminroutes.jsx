@@ -7,6 +7,7 @@ import Dashboard from "../admin/components/Dashboard/Dashboard";
 import Categories from "../admin/components/inventory/category";
 import Subcategories from "../admin/components/inventory/Subcategory";
 import Items from "../admin/components/inventory/item";
+import Stockmanagement from "../admin/components/inventory/Stockmanagement";
 import ItemDetails from "../admin/components/inventory/Itemdetails";
 import Banner from "../admin/components/Banner/Banner";
 import Brand from "../admin/components/Brands/Brands";
@@ -44,12 +45,14 @@ import InfluencerCoupons from "../admin/components/influencer/influencercoupon";
 import InfluencerCouponsForm from "../admin/components/influencer/influencercouponform";
 import CouponAnalytics from "../admin/components/coupon/CouponAnayltics";
 import InfluencerCouponManage from "../admin/components/influencer/influencercouponmanagement";
-import ExchangeForm from "../admin/components/exchange/exchnagePolicyform";
-import Exchanges from "../admin/components/exchange/exchangePolicy";
+import ExchangeForm from "../admin/components/Policy/exchnagePolicyform";
+import Exchanges from "../admin/components/Policy/exchangePolicy";
 import Status from "../admin/components/Status/Status";
 import StatusPage from "../admin/components/Status/Statusform";
 import Orders from "../admin/components/orders/order";
 import Reviews from "../admin/components/Review/Reviews";
+import Cancellation from "../admin/components/Policy/cancellationPolicy";
+import CancellationForm from "../admin/components/Policy/cancellationform";
 const AdminRoutes = () => {
   return (
     <Routes>
@@ -78,6 +81,7 @@ const AdminRoutes = () => {
         <Route path="inventory/items/:categoryId/:subcategoryId/create" element={<ItemForm />} />
         <Route path="inventory/items/:categoryId/:subcategoryId/edit/:id" element={<ItemForm />} />
         <Route path="inventory/items/:itemId" element={<ItemDetails />} />
+        <Route path="inventory/stock-management" element={<Stockmanagement />} />
 
         <Route path="banners" element={<Banner />} />
         <Route path="banners/create" element={<BannerForm />} />
@@ -136,10 +140,14 @@ const AdminRoutes = () => {
         <Route path="exchange" element={<Exchanges/>}/>
         <Route path="exchange/create" element={<ExchangeForm/>}/>
         <Route path="exchange/edit/:id" element={<ExchangeForm/>}/>
+        <Route path="cancellation" element={<Cancellation/>}/>
+        <Route path ="cancellation/create" element={<CancellationForm/>}/>
+        <Route path="cancellation/edit/:id" element={<CancellationForm/>}/>
 
         <Route path="warehouse" element={<Warehouse />} />
         <Route path="warehouse/create" element={<WarehouseForm />} />
         <Route path="warehouse/edit/:id" element={<WarehouseForm />} />
+        <Route path="stocks" element={<Stockmanagement/>}/>
         <Route path="influencer/coupons" element={<InfluencerCoupons />} />
         <Route path="influencer/coupons/create" element={<InfluencerCouponsForm />} />
         <Route path="influencer/coupons/edit/:id" element={<InfluencerCouponsForm />} />

@@ -26,6 +26,7 @@ const Sidebar = () => {
   const [isInventoryOpen, setIsInventoryOpen] = useState(true);
   const [isOpen, setIsOpen] = useState(false);
   const [isCouponOpen, setIsCouponOpen] = useState(false);
+  const [isPolicyOpen, setIsPolicyOpen] = useState(false);
   const [isInfluencerOpen, setIsInfluencerOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const location = useLocation();
@@ -202,7 +203,7 @@ const Sidebar = () => {
                     SubCategories
                   </Link> */}
                   <Link
-                    to="/admin/items"
+                    to="/admin/stocks"
                     className={`block px-4 py-2.5 text-gray-400 hover:bg-white hover:text-black transition-all duration-200 text-sm font-medium ${
                       location.pathname.includes("/admin/items")
                         ? "bg-white/10 text-white"
@@ -273,18 +274,59 @@ const Sidebar = () => {
               />
               <span>Sections</span>
             </Link>
-            <Link
-              to="/admin/exchange"
-              className={`flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-white hover:text-black transition-all duration-200 font-medium group ${
-                isActive("/admin/exchange") ? "bg-white/10 text-white" : ""
-              }`}
-            >
-              <ShoppingCart
-                size={20}
-                className="text-gray-400 group-hover:text-black"
-              />
-              <span>Exchange</span>
-            </Link>
+            {/* Policy Dropdown */}
+            <div>
+              <button
+                onClick={() => setIsPolicyOpen(!isPolicyOpen)}
+                className="w-full flex items-center justify-between px-4 py-3 text-gray-300 hover:bg-white hover:text-black transition-all duration-200 font-medium group"
+              >
+                <div className="flex items-center gap-3">
+                  <ShoppingCart
+                    size={20}
+                    className="text-gray-400 group-hover:text-black"
+                  />
+                  <span>Policy</span>
+                </div>
+
+                {isPolicyOpen ? (
+                  <ChevronDown size={18} className="text-gray-400" />
+                ) : (
+                  <ChevronRight size={18} className="text-gray-400" />
+                )}
+              </button>
+
+              <div
+                className={`overflow-hidden transition-all duration-300 ${
+                  isPolicyOpen
+                    ? "max-h-40 opacity-100 mt-1"
+                    : "max-h-0 opacity-0"
+                }`}
+              >
+                <div className="pl-10 pr-4 py-2 space-y-1">
+                  <Link
+                    to="/admin/exchange"
+                    className={`block px-4 py-2 text-sm text-gray-400 hover:bg-white hover:text-black ${
+                      location.pathname.includes("/admin/exchange")
+                        ? "bg-white/10 text-white"
+                        : ""
+                    }`}
+                  >
+                    Exchange
+                  </Link>
+
+                  <Link
+                    to="/admin/cancellation"
+                    className={`block px-4 py-2 text-sm text-gray-400 hover:bg-white hover:text-black ${
+                      location.pathname.includes("/admin/cancellation")
+                        ? "bg-white/10 text-white"
+                        : ""
+                    }`}
+                  >
+                    Cancellation
+                  </Link>
+                </div>
+              </div>
+            </div>
 
             <Link
               to="/admin/banners"
@@ -325,7 +367,7 @@ const Sidebar = () => {
               <span>Features</span>
             </Link>
 
-             <Link
+            <Link
               to="/admin/orders"
               className={`flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-white hover:text-black transition-all duration-200 font-medium group ${
                 isActive("/admin/orders") ? "bg-white/10 text-white" : ""
@@ -336,8 +378,6 @@ const Sidebar = () => {
                 className="text-gray-400 group-hover:text-black"
               />
               <span>Orders</span>
-
-              
             </Link>
 
             {/* <Link
@@ -420,7 +460,7 @@ const Sidebar = () => {
               <span>Cart</span>
             </Link>
 
-             <Link
+            <Link
               to="/admin/reviews"
               className={`flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-white hover:text-black transition-all duration-200 font-medium group ${
                 isActive("/admin/reviews") ? "bg-white/10 text-white" : ""

@@ -5,7 +5,6 @@ import {
   getSingleOrder,
   updateOrderItemStatus,
 } from "../../apis/Orderapi";
-
 import {
   Search,
   ChevronLeft,
@@ -17,6 +16,7 @@ import {
   Truck,
   RefreshCw,
   Eye,
+  AlertCircle,
 } from "lucide-react";
 
 const Orders = () => {
@@ -27,37 +27,39 @@ const Orders = () => {
     total: 0,
     totalPages: 1,
   });
-
   const [search, setSearch] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [orderLoading, setOrderLoading] = useState(false);
-  const [statusFilter, setStatusFilter] = useState("");
+  const [orderError, setOrderError] = useState(null);
+
+  const [updatingItemId, setUpdatingItemId] = useState(null);
   const [itemPage, setItemPage] = useState(1);
   const itemLimit = 8;
 
   const fetchOrders = useCallback(async () => {
     try {
       setLoading(true);
+      setError(null);
       const res = await getOrders(
         pagination.page,
         pagination.limit,
         search,
         statusFilter
       );
-      console.log("GET /admin/orders response:", res);
-
       const data = res?.data || {};
       setOrders(data.orders || data.data || []);
       setPagination((prev) => ({
         ...prev,
         total: data.total || 0,
-        totalPages:
-          data.totalPages ||
-          Math.ceil((data.count || data.orders?.length || 0) / prev.limit),
+        totalPages: data.totalPages || Math.ceil((data.count || data.orders?.length || 0) / prev.limit),
       }));
     } catch (err) {
       console.error("Failed to fetch orders:", err);
+      setError(err?.response?.data?.message || "Failed to load orders. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -67,70 +69,144 @@ const Orders = () => {
     fetchOrders();
   }, [fetchOrders]);
 
-  const fetchSingleOrder = async (orderId) => {   // ← orderId here is now the custom "ORD-..." string
-    if (!orderId) {
-      console.warn("No valid orderId provided");
-      return;
-    }
-
+  const fetchSingleOrder = async (orderId) => {
+    if (!orderId) return;
     try {
       setOrderLoading(true);
-      console.log(`Fetching order ${orderId} | item page: ${itemPage}`);
+      setOrderError(null);
       const res = await getSingleOrder(orderId, itemPage, itemLimit);
-      console.log("Single order response:", res?.data);
       setSelectedOrder(res?.data || null);
     } catch (err) {
-      console.error("Failed to load single order:", err?.response?.data || err);
-      alert("Could not load order details");
+      console.error("Failed to load order:", err);
+      setOrderError(err?.response?.data?.message || "Could not load order details.");
     } finally {
       setOrderLoading(false);
     }
   };
 
   const handleUpdateItemStatus = async (orderId, itemId, newStatus) => {
-    if (!orderId || !itemId) return;
+    if (!orderId || !itemId || !newStatus) return;
+
+    const stringItemId = String(itemId);
+    setUpdatingItemId(stringItemId);
+
+    const prevItem = selectedOrder?.items?.find(
+      (it) => String(it.itemId || it._id) === stringItemId
+    );
+    const prevStatus = prevItem?.status;
+
+    setSelectedOrder((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        items: prev.items.map((it) =>
+          String(it.itemId || it._id) === stringItemId
+            ? { ...it, status: newStatus }
+            : it
+        ),
+      };
+    });
 
     try {
       const payload = { status: newStatus };
-      const res = await updateOrderItemStatus(orderId, itemId, payload);
-      console.log("Item status updated:", res);
-
-      await fetchSingleOrder(orderId);
+      await updateOrderItemStatus(orderId, itemId, payload);
     } catch (err) {
       console.error("Status update failed:", err);
-      alert("Failed to update item status");
+      const msg = err?.response?.data?.message || "Failed to update item status.";
+      alert(msg);
+
+      if (prevStatus) {
+        setSelectedOrder((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            items: prev.items.map((it) =>
+              String(it.itemId || it._id) === stringItemId
+                ? { ...it, status: prevStatus }
+                : it
+            ),
+          };
+        });
+      }
+    } finally {
+      setUpdatingItemId(null);
     }
   };
 
-  // Status badge (unchanged)
   const getStatusBadge = (status = "pending") => {
-    const s = (status || "pending").toUpperCase();
+    let s = (status || "pending")
+      .toUpperCase()
+      .replace(/_/g, " ")           // exchange_requested → EXCHANGE REQUESTED
+      .trim();
+
     const statusStyles = {
       PENDING: { bg: "bg-yellow-100", text: "text-yellow-800", Icon: Clock },
+      CREATED: { bg: "bg-yellow-100", text: "text-yellow-800", Icon: Clock },
       PROCESSING: { bg: "bg-blue-100", text: "text-blue-800", Icon: RefreshCw },
       CONFIRMED: { bg: "bg-indigo-100", text: "text-indigo-800", Icon: RefreshCw },
       SHIPPED: { bg: "bg-purple-100", text: "text-purple-800", Icon: Truck },
       DELIVERED: { bg: "bg-green-100", text: "text-green-800", Icon: CheckCircle },
       CANCELLED: { bg: "bg-red-100", text: "text-red-800", Icon: XCircle },
+      "OUT FOR DELIVERY": { bg: "bg-cyan-100", text: "text-cyan-800", Icon: Truck },
+      "EXCHANGE REQUESTED": { bg: "bg-orange-100", text: "text-orange-800", Icon: RefreshCw },
+      "EXCHANGE APPROVED": { bg: "bg-teal-100", text: "text-teal-800", Icon: CheckCircle },
+      "EXCHANGE REJECTED": { bg: "bg-pink-100", text: "text-pink-800", Icon: XCircle },
+      "EXCHANGE PICKUP SCHEDULED": { bg: "bg-amber-100", text: "text-amber-800", Icon: Truck },
+      "EXCHANGE PICKED": { bg: "bg-amber-100", text: "text-amber-800", Icon: Truck },
+      "EXCHANGE RECEIVED": { bg: "bg-teal-100", text: "text-teal-800", Icon: Package },
+      "EXCHANGE PROCESSING": { bg: "bg-blue-100", text: "text-blue-800", Icon: RefreshCw },
+      "EXCHANGE SHIPPED": { bg: "bg-purple-100", text: "text-purple-800", Icon: Truck },
+      "EXCHANGE DELIVERED": { bg: "bg-green-100", text: "text-green-800", Icon: CheckCircle },
+      "EXCHANGE COMPLETED": { bg: "bg-green-100", text: "text-green-800", Icon: CheckCircle },
     };
 
     const { bg = "bg-gray-100", text = "text-gray-800", Icon = Clock } =
       statusStyles[s] || statusStyles.PENDING;
 
+    // Shorten very long statuses for better display
+    let displayText = s.charAt(0) + s.slice(1).toLowerCase();
+    if (displayText.length > 24) {
+      displayText = displayText
+        .replace("Exchange ", "Ex. ")
+        .replace("Pickup Scheduled", "Pickup Sch.")
+        .replace("Out For Delivery", "Out for Del.");
+    }
+
     return (
-      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium ${bg} ${text}`}>
+      <span
+        className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs sm:text-sm font-medium ${bg} ${text} max-w-full truncate`}
+      >
         <Icon size={14} />
-        {s.charAt(0) + s.slice(1).toLowerCase()}
+        {displayText}
       </span>
     );
   };
 
-  const statusOptions = ["Pending", "Processing", "Confirmed", "Shipped", "Delivered", "Cancelled"];
+  // Backend ORDER_STATUS_ENUM – value must match exactly for API
+  const statusOptions = [
+    { value: "CREATED", label: "Created" },
+    { value: "CONFIRMED", label: "Confirmed" },
+    { value: "PROCESSING", label: "Processing" },
+    { value: "SHIPPED", label: "Shipped" },
+    { value: "OUT_FOR_DELIVERY", label: "Out for delivery" },
+    { value: "DELIVERED", label: "Delivered" },
+    { value: "CANCELLED", label: "Cancelled" },
+    { value: "EXCHANGE_REQUESTED", label: "Exchange requested" },
+    { value: "EXCHANGE_APPROVED", label: "Exchange approved" },
+    { value: "EXCHANGE_REJECTED", label: "Exchange rejected" },
+    { value: "EXCHANGE_PICKUP_SCHEDULED", label: "Exchange pickup scheduled" },
+    { value: "EXCHANGE_PICKED", label: "Exchange picked" },
+    { value: "EXCHANGE_RECEIVED", label: "Exchange received" },
+    { value: "EXCHANGE_PROCESSING", label: "Exchange processing" },
+    { value: "EXCHANGE_SHIPPED", label: "Exchange shipped" },
+    { value: "EXCHANGE_DELIVERED", label: "Exchange delivered" },
+    { value: "EXCHANGE_COMPLETED", label: "Exchange completed" },
+  ];
 
   return (
     <div className="min-h-screen px-4 py-6 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl">
-        {/* Header + Search – unchanged */}
+        {/* Header + Search */}
         <div className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl flex items-center gap-3">
             <Package className="h-8 w-8 text-indigo-600" />
@@ -151,84 +227,96 @@ const Orders = () => {
           </div>
         </div>
 
-        {!selectedOrder ? (
-          <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
-            <div className="w-full  ">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-5 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Order</th>
-                    <th className="px-5 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Customer</th>
-                    <th className="px-5 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Phone</th>
-                    <th className="px-5 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Items</th>
-                    <th className="px-5 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Total</th>
-                    <th className="px-5 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Status</th>
-                    <th className="px-5 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Date</th>
-                    <th className="px-5 py-4 text-center text-xs font-semibold uppercase tracking-wider text-gray-600">View</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100 bg-white">
-                  {loading ? (
-                    <tr><td colSpan={8} className="py-16 text-center text-gray-500">Loading orders…</td></tr>
-                  ) : orders.length === 0 ? (
-                    <tr><td colSpan={8} className="py-16 text-center text-gray-500">No orders found</td></tr>
-                  ) : (
-                    orders.map((order) => (
-                      <tr key={order._id} className="hover:bg-gray-50/70 transition-colors">
-                        <td className="break-words px-4 py-4 font-medium text-indigo-600">
-                          #{order.orderId || order._id?.slice(-8).toUpperCase()}
-                        </td>
-                        <td className="whitespace-nowrap px-5 py-4">
-                          <div className="text-sm font-medium text-gray-900">
-                            {order.user?.name || order.address?.name || "—"}
-                          </div>
-                        </td>
-                        <td className="whitespace-nowrap px-5 py-4 text-sm text-gray-700">
-                          {order.user?.countryCode || ""}
-                          {order.user?.phoneNumber || order.address?.phone || "—"}
-                        </td>
-                        <td className="whitespace-nowrap px-5 py-4 text-sm text-gray-600">
-                          {order.totalItems || order.totalQuantity || order.items?.length || "?"}
-                        </td>
-                        <td className="whitespace-nowrap px-5 py-4 text-sm font-medium text-gray-900">
-                          ₹{(order.totalAmount || order.pricing?.finalPayable || 0).toLocaleString("en-IN")}
-                        </td>
-                        <td className="whitespace-nowrap px-5 py-4">
-                          {getStatusBadge(order.status || order.orderStatus)}
-                        </td>
-                        <td className="whitespace-nowrap px-5 py-4 text-sm text-gray-500">
-                          {new Date(order.createdAt).toLocaleDateString("en-IN", {
-                            day: "numeric",
-                            month: "short",
-                            year: "numeric",
-                          })}
-                        </td>
-                        <td className="whitespace-nowrap px-5 py-4 text-center">
-                          <button
-                            onClick={() => {
-                              const customOrderId = order.orderId;
-                              if (!customOrderId) {
-                                console.error("Order missing orderId field:", order);
-                                alert("Cannot view — missing order ID");
-                                return;
-                              }
-                              setItemPage(1);
-                              fetchSingleOrder(customOrderId);           // ← FIXED: use order.orderId
-                            }}
-                            className="rounded-lg p-2 text-indigo-600 hover:bg-indigo-50 hover:text-indigo-800 transition"
-                            title="View order details"
-                          >
-                            <Eye size={18} />
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+        {error && (
+          <div className="mb-6 rounded-lg bg-red-50 p-4 text-red-700 flex items-center gap-2">
+            <AlertCircle size={20} />
+            {error}
+          </div>
+        )}
 
-            {/* List Pagination – unchanged */}
+        {!selectedOrder ? (
+          <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+            <table className="min-w-full table-auto divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Order</th>
+                  <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Customer</th>
+                  <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Phone</th>
+                  <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Items</th>
+                  <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Total</th>
+                  <th className="px-4 py-4 min-w-[160px] text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Status</th>
+                  <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Date</th>
+                  <th className="px-4 py-4 text-center text-xs font-semibold uppercase tracking-wider text-gray-600">View</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 bg-white">
+                {loading ? (
+                  <tr>
+                    <td colSpan={8} className="py-16 text-center text-gray-500">
+                      Loading orders…
+                    </td>
+                  </tr>
+                ) : orders.length === 0 ? (
+                  <tr>
+                    <td colSpan={8} className="py-16 text-center text-gray-500">
+                      No orders found
+                    </td>
+                  </tr>
+                ) : (
+                  orders.map((order) => (
+                    <tr key={order._id} className="hover:bg-gray-50/70 transition-colors">
+                      <td className="break-words px-4 py-4 font-medium text-indigo-600">
+                        #{order.orderId || order._id?.slice(-8).toUpperCase()}
+                      </td>
+                      <td className="px-4 py-4">
+                        <div className="text-sm font-medium text-gray-900">
+                          {order.user?.name || order.address?.name || "—"}
+                        </div>
+                      </td>
+                      <td className="px-4 py-4 text-sm text-gray-700">
+                        {order.user?.countryCode || ""}
+                        {order.user?.phoneNumber || order.address?.phone || "—"}
+                      </td>
+                      <td className="px-4 py-4 text-sm text-gray-600">
+                        {order.totalItems || order.totalQuantity || order.items?.length || "?"}
+                      </td>
+                      <td className="px-4 py-4 text-sm font-medium text-gray-900">
+                        ₹{(order.totalAmount || order.pricing?.finalPayable || 0).toLocaleString("en-IN")}
+                      </td>
+                      <td className="px-4 py-4 min-w-[160px]">
+                        {getStatusBadge(order.status || order.orderStatus)}
+                      </td>
+                      <td className="px-4 py-4 text-sm text-gray-500">
+                        {new Date(order.createdAt).toLocaleDateString("en-IN", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        })}
+                      </td>
+                      <td className="px-4 py-4 text-center">
+                        <button
+                          onClick={() => {
+                            const customOrderId = order.orderId;
+                            if (!customOrderId) {
+                              setError("Order is missing valid orderId");
+                              return;
+                            }
+                            setItemPage(1);
+                            fetchSingleOrder(customOrderId);
+                          }}
+                          className="rounded-lg p-2 text-indigo-600 hover:bg-indigo-50 hover:text-indigo-800 transition"
+                          title="View order details"
+                        >
+                          <Eye size={18} />
+                        </button>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+
+            {/* Pagination */}
             <div className="flex items-center justify-between border-t border-gray-200 px-5 py-4">
               <div className="text-sm text-gray-700">
                 Page <span className="font-medium">{pagination.page}</span> of{" "}
@@ -236,14 +324,14 @@ const Orders = () => {
               </div>
               <div className="flex gap-2">
                 <button
-                  disabled={pagination.page <= 1}
+                  disabled={pagination.page <= 1 || loading}
                   onClick={() => setPagination((p) => ({ ...p, page: Math.max(1, p.page - 1) }))}
                   className="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-4 py-2 text-sm disabled:opacity-50 hover:bg-gray-50"
                 >
                   <ChevronLeft size={16} /> Prev
                 </button>
                 <button
-                  disabled={pagination.page >= pagination.totalPages}
+                  disabled={pagination.page >= pagination.totalPages || loading}
                   onClick={() => setPagination((p) => ({ ...p, page: p.page + 1 }))}
                   className="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-4 py-2 text-sm disabled:opacity-50 hover:bg-gray-50"
                 >
@@ -257,7 +345,10 @@ const Orders = () => {
           <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
             <div className="border-b bg-gray-50 px-6 py-5">
               <button
-                onClick={() => setSelectedOrder(null)}
+                onClick={() => {
+                  setSelectedOrder(null);
+                  setOrderError(null);
+                }}
                 className="mb-2 text-sm font-medium text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
               >
                 ← Back to orders
@@ -270,26 +361,12 @@ const Orders = () => {
               </div>
             </div>
 
-            <div className="grid gap-8 p-6 md:grid-cols-2">
-              <div>
-                <h3 className="mb-4 text-lg font-semibold text-gray-800">Customer & Delivery</h3>
-                <div className="space-y-2.5 text-gray-700">
-                  <p><strong>Name:</strong> {selectedOrder.user?.name || selectedOrder.userId?.name || selectedOrder.address?.name || "—"}</p>
-                  <p><strong>Phone:</strong> {selectedOrder.user?.countryCode}{selectedOrder.user?.phoneNumber || selectedOrder.address?.phone || "—"}</p>
-                  <p><strong>Address:</strong><br />{selectedOrder.address?.fullAddress || "—"}</p>
-                </div>
+            {orderError && (
+              <div className="mx-6 mt-4 rounded-lg bg-red-50 p-4 text-red-700 flex items-center gap-2">
+                <AlertCircle size={20} />
+                {orderError}
               </div>
-
-              <div>
-                <h3 className="mb-4 text-lg font-semibold text-gray-800">Order Summary</h3>
-                <div className="space-y-2.5 text-gray-700">
-                  <p><strong>Placed:</strong> {new Date(selectedOrder.createdAt).toLocaleString("en-IN")}</p>
-                  <p><strong>Items:</strong> {selectedOrder.totalQuantity || selectedOrder.items?.length || 0}</p>
-                  <p><strong>Total:</strong> <span className="text-lg font-bold text-gray-900">₹{(selectedOrder.pricing?.finalPayable || selectedOrder.totalAmount || 0).toLocaleString("en-IN")}</span></p>
-                  <p><strong>Payment:</strong> {selectedOrder.payment?.mode || "—"} • {selectedOrder.payment?.status || "—"}</p>
-                </div>
-              </div>
-            </div>
+            )}
 
             <div className="px-6 pb-8">
               <h3 className="mb-4 text-lg font-semibold text-gray-800">Order Items</h3>
@@ -306,51 +383,77 @@ const Orders = () => {
                         <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Product</th>
                         <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Qty</th>
                         <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Price</th>
-                        <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Status</th>
+                        <th className="px-5 py-3.5 min-w-[160px] text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Status</th>
                         <th className="px-5 py-3.5 text-center text-xs font-semibold uppercase tracking-wider text-gray-600">Change Status</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 bg-white">
-                      {selectedOrder.items.map((item) => (
-                        <tr key={item.itemId || item._id} className="hover:bg-gray-50/60">
-                          <td className="px-5 py-4">
-                            <div className="flex items-center gap-3">
-                              {item.variant?.imageUrl && (
-                                <img src={item.variant.imageUrl} alt={item.sku || "Product"} className="h-12 w-12 rounded object-cover" />
-                              )}
-                              <div>
-                                <div className="font-medium text-gray-900">{item.sku || item.variant?.sku || "—"}</div>
-                                <div className="mt-0.5 text-xs text-gray-500">
-                                  {item.variant?.color && `Color: ${item.variant.color}`}
-                                  {item.variant?.size && ` • Size: ${item.variant.size}`}
+                      {selectedOrder.items.map((item) => {
+                        const itemId = String(item.itemId || item._id);
+                        const isUpdating = updatingItemId === itemId;
+
+                        return (
+                          <tr key={itemId} className="hover:bg-gray-50/60">
+                            <td className="px-5 py-4">
+                              <div className="flex items-center gap-3">
+                                {item.variant?.imageUrl && (
+                                  <img
+                                    src={item.variant.imageUrl}
+                                    alt={item.sku}
+                                    className="h-12 w-12 rounded object-cover"
+                                  />
+                                )}
+                                <div>
+                                  <div className="font-medium text-gray-900">
+                                    {item.sku || item.variant?.sku || "—"}
+                                  </div>
+                                  <div className="mt-0.5 text-xs text-gray-500">
+                                    {item.variant?.color && `Color: ${item.variant.color}`}
+                                    {item.variant?.size && ` • Size: ${item.variant.size}`}
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          </td>
-                          <td className="whitespace-nowrap px-5 py-4 text-gray-700">{item.quantity}</td>
-                          <td className="whitespace-nowrap px-5 py-4 font-medium text-gray-900">₹{(item.unitPrice || 0).toLocaleString("en-IN")}</td>
-                          <td className="whitespace-nowrap px-5 py-4">{getStatusBadge(item.status)}</td>
-                          <td className="whitespace-nowrap px-5 py-4 text-center">
-                            <select
-                              value={item.status || "Pending"}
-                              onChange={(e) => {
-                                if (window.confirm(`Update status to "${e.target.value}"?`)) {
-                                  handleUpdateItemStatus(
-                                    selectedOrder.orderId,           // ← FIXED: use orderId string here too
-                                    item.itemId || item._id,
-                                    e.target.value
-                                  );
-                                }
-                              }}
-                              className="rounded border border-gray-300 px-3 py-1.5 text-sm focus:border-indigo-500 focus:ring-indigo-500"
-                            >
-                              {statusOptions.map((opt) => (
-                                <option key={opt} value={opt}>{opt}</option>
-                              ))}
-                            </select>
-                          </td>
-                        </tr>
-                      ))}
+                            </td>
+                            <td className="whitespace-nowrap px-5 py-4 text-gray-700">{item.quantity}</td>
+                            <td className="whitespace-nowrap px-5 py-4 font-medium text-gray-900">
+                              ₹{(item.unitPrice || 0).toLocaleString("en-IN")}
+                            </td>
+                            <td className="px-5 py-4 min-w-[160px]">
+                              {getStatusBadge(item.status)}
+                            </td>
+                            <td className="whitespace-nowrap px-5 py-4 text-center">
+                              <div className="relative inline-block">
+                                <select
+                                  value={item.status || "CREATED"}
+                                  onChange={(e) => {
+                                    const newVal = e.target.value;
+                                    const label = statusOptions.find((o) => o.value === newVal)?.label || newVal;
+                                    if (window.confirm(`Update to "${label}"?`)) {
+                                      handleUpdateItemStatus(selectedOrder.orderId, itemId, newVal);
+                                    }
+                                  }}
+                                  disabled={isUpdating}
+                                  className={`rounded border border-gray-300 px-3 py-1.5 text-sm focus:border-indigo-500 focus:ring-indigo-500 ${
+                                    isUpdating ? "opacity-60 cursor-wait" : ""
+                                  }`}
+                                >
+                                  {statusOptions.map((opt) => (
+                                    <option key={opt.value} value={opt.value}>
+                                      {opt.label}
+                                    </option>
+                                  ))}
+                                </select>
+
+                                {isUpdating && (
+                                  <div className="absolute inset-0 flex items-center justify-center bg-white/60 rounded">
+                                    <RefreshCw size={16} className="animate-spin text-indigo-600" />
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -359,7 +462,7 @@ const Orders = () => {
               {selectedOrder?.itemsPagination?.total > itemLimit && (
                 <div className="mt-6 flex items-center justify-center gap-4">
                   <button
-                    disabled={itemPage <= 1}
+                    disabled={itemPage <= 1 || orderLoading}
                     onClick={() => {
                       setItemPage((p) => Math.max(1, p - 1));
                       fetchSingleOrder(selectedOrder.orderId);
@@ -372,7 +475,7 @@ const Orders = () => {
                     Page {itemPage} of {selectedOrder.itemsPagination?.totalPages || 1}
                   </span>
                   <button
-                    disabled={itemPage >= (selectedOrder.itemsPagination?.totalPages || 1)}
+                    disabled={itemPage >= (selectedOrder.itemsPagination?.totalPages || 1) || orderLoading}
                     onClick={() => {
                       setItemPage((p) => p + 1);
                       fetchSingleOrder(selectedOrder.orderId);
