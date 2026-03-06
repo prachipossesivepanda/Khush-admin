@@ -421,18 +421,7 @@ const Sidebar = () => {
               <span>Home banners</span>
             </Link>
 
-            <Link
-              to="/admin/driver"
-              className={`flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-white hover:text-black transition-all duration-200 font-medium group ${
-                isActive("/admin/driver") ? "bg-white/10 text-white" : ""
-              }`}
-            >
-              <Truck
-                size={20}
-                className="text-gray-400 group-hover:text-black"
-              />
-              <span>Driver</span>
-            </Link>
+            
 
             <Link
               to="/admin/warehouse"

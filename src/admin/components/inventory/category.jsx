@@ -9,6 +9,7 @@ import {
 export default function Categories() {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
+  const [expandedNames, setExpandedNames] = useState({});
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [fullDescription, setFullDescription] = useState(null);
   const [categories, setCategories] = useState([]);
@@ -127,17 +128,24 @@ export default function Categories() {
   const handleCategoryClick = (categoryId) => {
     navigate(`/admin/inventory/subcategories/${categoryId}`);
   };
+
+  const toggleName = (id) => {
+    setExpandedNames((prev) => ({
+      ...prev,
+      [id]: !prev[id],
+    }));
+  };
   // RENDER
   return (
     <div className="w-full min-h-screen">
       {/* Header */}
       <div className="sticky top-0 z-20 bg-white h-16 flex items-center border-b border-gray-200">
-  <div className="px-4 sm:px-6 w-full">
-    <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-gray-900">
-      Categories
-    </h1>
-  </div>
-</div>
+        <div className="px-4 sm:px-6 w-full">
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-gray-900">
+            Categories
+          </h1>
+        </div>
+      </div>
       {/* Static Search Bar */}
       <div className="sticky top-16 z-10 bg-white border-b border-gray-200 px-3 sm:px-4 md:px-6 py-4 sm:py-4">
         <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
@@ -253,8 +261,28 @@ export default function Categories() {
                           </div>
                         </td>
                         <td className="px-3 py-3 lg:py-4 text-xs lg:text-sm font-medium text-gray-900">
-                          <div className="truncate" title={cat.name}>
-                            {cat.name}
+                          <div>
+                            <span
+                              className={`${
+                                expandedNames[cat.id] ? "" : "line-clamp-1"
+                              }`}
+                            >
+                              {cat.name}
+                            </span>
+
+                            {cat.name && cat.name.length > 20 && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleName(cat.id);
+                                }}
+                                className="ml-1 text-xs text-blue-600 hover:underline"
+                              >
+                                {expandedNames[cat.id]
+                                  ? "See less"
+                                  : "See more"}
+                              </button>
+                            )}
                           </div>
                         </td>
                         <td className="hidden lg:table-cell px-4 py-3 lg:py-4 text-xs lg:text-sm text-gray-600">
@@ -477,31 +505,29 @@ export default function Categories() {
         </div>
       )}
       {fullDescription && (
-  <div
-    className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
-    onClick={() => setFullDescription(null)}
-  >
-    <div
-      className="bg-white max-w-lg w-full rounded-xl p-6 shadow-xl"
-      onClick={(e) => e.stopPropagation()}
-    >
-      <h2 className="text-lg font-semibold mb-4">
-        Category Description
-      </h2>
-      <p className="text-sm text-gray-700 whitespace-pre-wrap">
-        {fullDescription}
-      </p>
-      <div className="mt-6 text-right">
-        <button
+        <div
+          className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
           onClick={() => setFullDescription(null)}
-          className="px-4 py-2 bg-black text-white rounded-lg text-sm"
         >
-          Close
-        </button>
-      </div>
-    </div>
-  </div>
-)}
+          <div
+            className="bg-white max-w-lg w-full rounded-xl p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-lg font-semibold mb-4">Category Description</h2>
+            <p className="text-sm text-gray-700 whitespace-pre-wrap">
+              {fullDescription}
+            </p>
+            <div className="mt-6 text-right">
+              <button
+                onClick={() => setFullDescription(null)}
+                className="px-4 py-2 bg-black text-white rounded-lg text-sm"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
-} 
+}

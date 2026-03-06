@@ -75,10 +75,10 @@ export default function Login() {
           <div className="p-8 sm:p-10">
             <div className="text-center mb-9">
               <h1 className="text-4xl font-bold text-gray-900 tracking-tight">
-                Welcome Back
+                Welcome Back Admin
               </h1>
               <p className="mt-3 text-gray-600">
-                Sign in with your phone number
+                Log in with your phone number
               </p>
             </div>
             <form onSubmit={handleSubmit} className="space-y-6">
