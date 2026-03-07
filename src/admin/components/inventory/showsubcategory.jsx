@@ -349,7 +349,7 @@ const Showsubcategory = () => {
                               selectedCategoryId === "" ? "bg-gray-100 font-semibold text-black" : "text-gray-700"
                             }`}
                           >
-                            All Subcategories
+                            All Subcategories/categories
                           </button>
 
                           {categories.map((cat) => (

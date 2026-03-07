@@ -30,10 +30,14 @@ const ItemForm = () => {
         color: { name: "Black", hex: "#000000" },
         images: [],
         sizes: [
+                    { sku: "", size: "XS", stock: "" },
+
           { sku: "", size: "S", stock: "" },
           { sku: "", size: "M", stock: "" },
           { sku: "", size: "L", stock: "" },
           { sku: "", size: "XL", stock: "" },
+                    { sku: "", size: "XXL", stock: "" },
+
         ],
       },
     ],
@@ -252,34 +256,42 @@ const ItemForm = () => {
 
   // Variant actions
   const addVariant = () => {
-    setForm((prev) => ({
-      ...prev,
-      variants: [
-        ...prev.variants,
-        {
-          color: { name: "", hex: "#000000" },
-          images: [],
-          sizes: [
-            { sku: "", size: "S", stock: "" },
-            { sku: "", size: "M", stock: "" },
-            { sku: "", size: "L", stock: "" },
-            { sku: "", size: "XL", stock: "" },
-          ],
-        },
-      ],
-    }));
+    console.log("[ItemForm] addVariant: current variants count:", form.variants.length);
+    setForm((prev) => {
+      const next = {
+        ...prev,
+        variants: [
+          ...prev.variants,
+          {
+            color: { name: "", hex: "#000000" },
+            images: [],
+            sizes: [
+              { sku: "", size: "S", stock: "" },
+              { sku: "", size: "M", stock: "" },
+              { sku: "", size: "L", stock: "" },
+              { sku: "", size: "XL", stock: "" },
+            ],
+          },
+        ],
+      };
+      console.log("[ItemForm] addVariant: new variants state:", next.variants);
+      return next;
+    });
   };
 
   const updateVariantColor = (index, field, value) => {
+    console.log("[ItemForm] updateVariantColor:", { index, field, value });
     setForm((prev) => {
       const newVariants = [...prev.variants];
       newVariants[index].color = { ...newVariants[index].color, [field]: value };
+      console.log("[ItemForm] updateVariantColor: updated variant color:", newVariants[index].color);
       return { ...prev, variants: newVariants };
     });
   };
 
   const addImageToVariant = (variantIndex, files) => {
     if (!files?.length) return;
+    console.log("[ItemForm] addImageToVariant: variantIndex, files:", variantIndex, files);
 
     // IMPORTANT: clone FileList immediately so it doesn't get cleared
     const fileArray = Array.from(files);
@@ -309,30 +321,41 @@ const ItemForm = () => {
       if (newFiles.length > 0) {
         newVariants[variantIndex].images = [...existingImages, ...newFiles];
       }
-
+      console.log("[ItemForm] addImageToVariant: new images length:", newVariants[variantIndex].images.length);
       return { ...prev, variants: newVariants };
     });
   };
 
   const removeImageFromVariant = (variantIndex, imageIndex) => {
+    console.log("[ItemForm] removeImageFromVariant:", { variantIndex, imageIndex });
     setForm((prev) => {
       const newVariants = [...prev.variants];
       newVariants[variantIndex].images.splice(imageIndex, 1);
+      console.log(
+        "[ItemForm] removeImageFromVariant: remaining images:",
+        newVariants[variantIndex].images.length
+      );
       return { ...prev, variants: newVariants };
     });
   };
 
   const updateSize = (variantIndex, sizeIndex, field, value) => {
+    console.log("[ItemForm] updateSize:", { variantIndex, sizeIndex, field, value });
     setForm((prev) => {
       const newVariants = [...prev.variants];
       const sizeObj = newVariants[variantIndex].sizes[sizeIndex];
       newVariants[variantIndex].sizes[sizeIndex] = { ...sizeObj, [field]: value };
+      console.log(
+        "[ItemForm] updateSize: updated size:",
+        newVariants[variantIndex].sizes[sizeIndex]
+      );
       return { ...prev, variants: newVariants };
     });
   };
 
   // Filters actions
   const addFilter = () => {
+    console.log("[ItemForm] addFilter: current filters:", form.filters);
     setForm((prev) => ({
       ...prev,
       filters: [...prev.filters, { key: "", value: "" }],
@@ -340,14 +363,17 @@ const ItemForm = () => {
   };
 
   const updateFilter = (index, field, value) => {
+    console.log("[ItemForm] updateFilter:", { index, field, value });
     setForm((prev) => {
       const newFilters = [...prev.filters];
       newFilters[index] = { ...newFilters[index], [field]: value };
+      console.log("[ItemForm] updateFilter: new filters:", newFilters);
       return { ...prev, filters: newFilters };
     });
   };
 
   const removeFilter = (index) => {
+    console.log("[ItemForm] removeFilter index:", index);
     setForm((prev) => ({
       ...prev,
       filters: prev.filters.filter((_, i) => i !== index),
@@ -356,6 +382,7 @@ const ItemForm = () => {
 
   // Care instructions handlers
   const addCareInstruction = () => {
+    console.log("[ItemForm] addCareInstruction: current count:", form.care.instructions.length);
     setForm((prev) => ({
       ...prev,
       care: {
@@ -369,6 +396,7 @@ const ItemForm = () => {
   };
 
   const updateCareInstruction = (index, field, value) => {
+    console.log("[ItemForm] updateCareInstruction:", { index, field, value });
     setForm((prev) => {
       const newInstructions = [...prev.care.instructions];
       newInstructions[index] = { ...newInstructions[index], [field]: value };
@@ -380,6 +408,7 @@ const ItemForm = () => {
   };
 
   const removeCareInstruction = (index) => {
+    console.log("[ItemForm] removeCareInstruction index:", index);
     setForm((prev) => ({
       ...prev,
       care: {
@@ -391,6 +420,7 @@ const ItemForm = () => {
 
   // Size chart handlers
   const addSizeChartHeader = () => {
+    console.log("[ItemForm] addSizeChartHeader: current headers:", form.sizeChart.headers);
     setForm((prev) => ({
       ...prev,
       sizeChart: {
@@ -401,9 +431,38 @@ const ItemForm = () => {
   };
 
   const updateSizeChartHeader = (index, field, value) => {
+    console.log("[ItemForm] updateSizeChartHeader:", { index, field, value });
     setForm((prev) => {
       const newHeaders = [...prev.sizeChart.headers];
-      newHeaders[index] = { ...newHeaders[index], [field]: value };
+      const header = { ...newHeaders[index] };
+
+      if (field === "key") {
+        header.key = value.trim();
+        // If label is empty, auto-generate from key
+        if (!header.label?.trim() && header.key) {
+          const pretty = header.key
+            .replace(/[_\-]+/g, " ")
+            .replace(/\s+/g, " ")
+            .trim();
+          header.label =
+            pretty.charAt(0).toUpperCase() + pretty.slice(1) + ` (${prev.sizeChart.unit})`;
+        }
+      } else if (field === "label") {
+        header.label = value;
+        // If key is empty, auto-generate from label
+        if (!header.key?.trim() && value.trim()) {
+          header.key = value
+            .toLowerCase()
+            .replace(/\(.*?\)/g, "") // remove existing unit
+            .replace(/[^a-z0-9]+/gi, "_")
+            .replace(/^_+|_+$/g, "");
+        }
+      } else {
+        header[field] = value;
+      }
+
+      newHeaders[index] = header;
+      console.log("[ItemForm] updateSizeChartHeader: new headers:", newHeaders);
       return {
         ...prev,
         sizeChart: { ...prev.sizeChart, headers: newHeaders },
@@ -412,6 +471,7 @@ const ItemForm = () => {
   };
 
   const removeSizeChartHeader = (index) => {
+    console.log("[ItemForm] removeSizeChartHeader index:", index);
     setForm((prev) => ({
       ...prev,
       sizeChart: {
@@ -422,6 +482,7 @@ const ItemForm = () => {
   };
 
   const addSizeChartRow = () => {
+    console.log("[ItemForm] addSizeChartRow: current rows:", form.sizeChart.rows);
     setForm((prev) => {
       const measurements = {};
       prev.sizeChart.headers.forEach((h) => {
@@ -438,6 +499,7 @@ const ItemForm = () => {
   };
 
   const updateSizeChartRow = (rowIndex, field, value) => {
+    console.log("[ItemForm] updateSizeChartRow:", { rowIndex, field, value });
     setForm((prev) => {
       const newRows = [...prev.sizeChart.rows];
       if (field === "size") {
@@ -459,6 +521,7 @@ const ItemForm = () => {
   };
 
   const removeSizeChartRow = (index) => {
+    console.log("[ItemForm] removeSizeChartRow index:", index);
     setForm((prev) => ({
       ...prev,
       sizeChart: {
@@ -470,6 +533,7 @@ const ItemForm = () => {
 
   const addSizeChartImage = (files) => {
     if (!files?.length) return;
+    console.log("[ItemForm] addSizeChartImage files:", files);
     setForm((prev) => ({
       ...prev,
       sizeChart: {
@@ -483,6 +547,7 @@ const ItemForm = () => {
   };
 
   const removeSizeChartImage = (index) => {
+    console.log("[ItemForm] removeSizeChartImage index:", index);
     setForm((prev) => {
       const newImages = [...prev.sizeChart.measureImages];
       newImages.splice(index, 1);
@@ -495,6 +560,8 @@ const ItemForm = () => {
 
   // Save handler
   const handleSave = async () => {
+    console.log("[ItemForm] handleSave: starting with mode:", isEdit ? "edit" : "create");
+    console.log("[ItemForm] handleSave: current form state:", form);
     try {
       setLoading(true);
       const formData = new FormData();
@@ -512,6 +579,7 @@ const ItemForm = () => {
       formData.append("isActive", String(form.isActive));
 
       // Variants - prepare JSON structure
+      console.log("[ItemForm] handleSave: preparing variantsData from variants:", form.variants);
       const variantsData = form.variants
         .filter((variant) => {
           // Only include variants with valid color names
@@ -555,7 +623,7 @@ const ItemForm = () => {
       if (!Array.isArray(variantsData) || variantsData.length === 0) {
         throw new Error("At least one variant with a color name is required");
       }
-      
+      console.log("[ItemForm] handleSave: variantsData:", variantsData);
       formData.append("variants", JSON.stringify(variantsData));
 
       // Variant images - multiple files per color variant (only File objects, not URLs)
@@ -589,17 +657,32 @@ const ItemForm = () => {
       });
 
       // Size chart - JSON + measure images
+      const cleanedHeaders = (form.sizeChart.headers || []).filter(
+        (h) => h && h.key && h.key.trim()
+      );
+
+      const cleanedRows = (form.sizeChart.rows || [])
+        .filter((row) => {
+          if (!row || !row.size || !row.size.toString().trim()) return false;
+          const measurements = row.measurements || {};
+          return Object.values(measurements).some(
+            (val) => val !== "" && val !== null && val !== undefined
+          );
+        })
+        .map((row) => ({
+          size: row.size,
+          measurements: row.measurements || {},
+        }));
+
       const sizeChartData = {
         unit: form.sizeChart.unit || "in",
-        headers: form.sizeChart.headers,
-        rows: form.sizeChart.rows.map((row) => ({
-          size: row.size,
-          measurements: row.measurements,
-        })),
+        headers: cleanedHeaders,
+        rows: cleanedRows,
         measureImage: form.sizeChart.measureImages.map((_, idx) => ({
           imageKey: `measureImages/${idx}`,
         })),
       };
+      console.log("[ItemForm] handleSave: sizeChartData:", sizeChartData);
       formData.append("sizeChart", JSON.stringify(sizeChartData));
 
       form.sizeChart.measureImages.forEach((file) => {
@@ -667,19 +750,23 @@ const ItemForm = () => {
 
       // Filters - JSON array
       formData.append("filters", JSON.stringify(form.filters));
+      console.log("[ItemForm] handleSave: filters:", form.filters);
 
       // Create or update based on mode
       if (isEdit && id) {
+        console.log("[ItemForm] handleSave: sending updateItem with id:", id);
         await updateItem(id, formData);
         alert("Product updated successfully!");
       } else {
+        console.log("[ItemForm] handleSave: sending createItem");
         await createItem(formData);
         alert("Product created successfully!");
       }
 
+      console.log("[ItemForm] handleSave: navigation to items list");
       navigate(`/admin/inventory/items/${categoryId}/${subcategoryId}`);
     } catch (err) {
-      console.error(isEdit ? "Update failed:" : "Create failed:", err);
+      console.error("[ItemForm] handleSave error:", err);
       alert(
         `Failed to ${isEdit ? "update" : "create"} product: ` +
           (err.response?.data?.message || "Unknown error")
