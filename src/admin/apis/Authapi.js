@@ -11,7 +11,8 @@ export const authEndpoints = {
   RESEND_OTP: "/admin/resend-otp",     // resend OTP  ✅ NEW
   LOGIN: "/admin/login",
   LOGOUT: "/admin/logout",
-  GET_PROFILE: "/auth/profile",
+GET_PROFILE: "/admin/getProfile",
+  UPDATE_PROFILE: "/admin/update-profile",
 };
 
 /**
@@ -70,4 +71,7 @@ export const logoutUser = () => {
  */
 export const getUserProfile = () => {
   return apiConnector("GET", authEndpoints.GET_PROFILE);
+};
+export const updateProfile = (data) => {
+  return apiConnector("PUT", authEndpoints.UPDATE_PROFILE, data);
 };

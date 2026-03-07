@@ -580,6 +580,16 @@ const Sidebar = () => {
             />
             <span>Settings</span>
           </Link>
+          <Link
+            to="/admin/profile"
+            className="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-white/10 hover:text-white transition-all duration-200 font-medium group mb-2"
+          >
+            <Settings
+              size={20}
+              className="text-gray-400 group-hover:text-white"
+            />
+            <span>Profile</span>
+          </Link>
 
           <button
             onClick={handleLogout}
