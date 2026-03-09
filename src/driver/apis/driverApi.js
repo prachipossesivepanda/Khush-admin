@@ -15,10 +15,13 @@ export const driverEndpoints = {
   GET_PROFILE: `${BASE}/getProfile`,
   TOGGLE_ONLINE: `${BASE}/toggle-online`,
   DELIVERIES: `${BASE}/deliveries`,
+  DELIVERIES_HISTORY: `${BASE}/deliveries/history`,
+  DELIVERIES_HISTORY_EXCHANGE: `${BASE}/deliveries/history/exchange`,
   ACCEPT: (id) => `${BASE}/deliveries/${id}/accept`,
   REJECT: (id) => `${BASE}/deliveries/${id}/reject`,
   PICKUP: (id) => `${BASE}/deliveries/${id}/pickup`,
   OUT_FOR_DELIVERY: (id) => `${BASE}/deliveries/${id}/out-for-delivery`,
+  COD_PAYMENT_QR: (id) => `${BASE}/deliveries/${id}/cod-payment-qr`,
   DELIVERED: (id) => `${BASE}/deliveries/${id}/delivered`,
 };
 
@@ -44,6 +47,20 @@ export const driverToggleOnline = (isOnline) =>
 /** GET – my deliveries (assignments). Returns array of assignments with order/items. */
 export const getMyDeliveries = () => apiConnector("GET", driverEndpoints.DELIVERIES);
 
+/** GET – order history (delivered). Query: page, limit. Returns { list, pagination }. */
+export const getOrderHistory = (page = 1, limit = 20) => {
+  const url = `${driverEndpoints.DELIVERIES_HISTORY}?page=${page}&limit=${limit}`;
+  console.log("[Driver API] getOrderHistory", { page, limit, url });
+  return apiConnector("GET", url);
+};
+
+/** GET – exchange order history. Query: page, limit. Returns { list, pagination }. */
+export const getExchangeHistory = (page = 1, limit = 20) => {
+  const url = `${driverEndpoints.DELIVERIES_HISTORY_EXCHANGE}?page=${page}&limit=${limit}`;
+  console.log("[Driver API] getExchangeHistory", { page, limit, url });
+  return apiConnector("GET", url);
+};
+
 /** POST – accept assignment. */
 export const acceptDelivery = (assignmentId) =>
   apiConnector("POST", driverEndpoints.ACCEPT(assignmentId));
@@ -60,6 +77,10 @@ export const markPickup = (assignmentId) =>
 export const markOutForDelivery = (assignmentId) =>
   apiConnector("POST", driverEndpoints.OUT_FOR_DELIVERY(assignmentId));
 
-/** POST – mark delivered. */
-export const markDelivered = (assignmentId) =>
-  apiConnector("POST", driverEndpoints.DELIVERED(assignmentId));
+/** POST – get COD payment QR (body not needed). Returns { qrCodeId, imageUrl, amount }. */
+export const getCodPaymentQr = (assignmentId) =>
+  apiConnector("POST", driverEndpoints.COD_PAYMENT_QR(assignmentId));
+
+/** POST – mark delivered. For COD, body: { paymentCollectedMethod: "CASH" | "ONLINE" }. */
+export const markDelivered = (assignmentId, body = {}) =>
+  apiConnector("POST", driverEndpoints.DELIVERED(assignmentId), body);
