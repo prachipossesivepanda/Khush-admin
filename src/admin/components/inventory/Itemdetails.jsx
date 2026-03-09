@@ -12,7 +12,9 @@ export default function ItemDetails() {
   const [activeTab, setActiveTab] = useState("general");
 
   const fetchItem = async () => {
+    console.log("[ItemDetails] fetchItem called with itemId:", itemId);
     if (!itemId) {
+      console.error("[ItemDetails] No itemId in route params");
       setError("No item ID provided");
       setLoading(false);
       return;
@@ -21,7 +23,9 @@ export default function ItemDetails() {
     try {
       setLoading(true);
       setError(null);
+      console.log("[ItemDetails] Calling getSingleItem API...");
       const res = await getSingleItem(itemId);
+      console.log("[ItemDetails] getSingleItem raw response:", res);
 
       let itemData =
         res?.data?.data ||
@@ -30,12 +34,34 @@ export default function ItemDetails() {
         res?.data ||
         null;
 
+      console.log("[ItemDetails] Parsed itemData:", itemData);
+      console.log("[ItemDetails] itemData.sizeChart:", itemData?.sizeChart);
+      if (itemData?.sizeChart) {
+        console.log(
+          "[ItemDetails] sizeChart.unit:",
+          itemData.sizeChart.unit,
+          "headers:",
+          itemData.sizeChart.headers,
+          "rows:",
+          itemData.sizeChart.rows,
+          "measureImage:",
+          itemData.sizeChart.measureImage
+        );
+      } else {
+        console.warn("[ItemDetails] sizeChart is missing on itemData");
+      }
+
       setItem(itemData);
+      // Expose last item globally for quick console inspection if needed
+      if (typeof window !== "undefined") {
+        window.__lastItemDetails = itemData;
+      }
 
       if (!itemData) {
         setError("Item data not found in response");
       }
     } catch (err) {
+      console.error("[ItemDetails] fetchItem error:", err);
       const errorMessage =
         err.response?.data?.message ||
         err.response?.data?.error ||
@@ -50,6 +76,28 @@ export default function ItemDetails() {
   useEffect(() => {
     fetchItem();
   }, [itemId]);
+
+  useEffect(() => {
+    console.log("[ItemDetails] activeTab changed:", activeTab);
+    if (activeTab === "size" && item) {
+      console.log(
+        "[ItemDetails] Size tab opened. Current item.sizeChart:",
+        item.sizeChart
+      );
+      if (item.sizeChart) {
+        console.log(
+          "[ItemDetails] sizeChart.unit:",
+          item.sizeChart.unit,
+          "headers:",
+          item.sizeChart.headers,
+          "rows:",
+          item.sizeChart.rows,
+          "measureImage:",
+          item.sizeChart.measureImage
+        );
+      }
+    }
+  }, [activeTab, item]);
 
   if (loading) {
     return (
@@ -257,6 +305,7 @@ export default function ItemDetails() {
               {/* SIZE */}
               {activeTab === "size" && item.sizeChart ? (
                 <div className="space-y-6 sm:space-y-8 lg:space-y-10">
+                  {console.log("[ItemDetails] Rendering Size tab with sizeChart:", item.sizeChart)}
                   <div className="overflow-x-auto -mx-4 sm:mx-0">
                     <div className="inline-block min-w-full align-middle">
                       <table className="w-full text-xs sm:text-sm">

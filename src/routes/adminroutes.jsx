@@ -53,6 +53,8 @@ import Orders from "../admin/components/orders/order";
 import Reviews from "../admin/components/Review/Reviews";
 import Cancellation from "../admin/components/Policy/cancellationPolicy";
 import CancellationForm from "../admin/components/Policy/cancellationform";
+import Profile from "../admin/components/Profile/Profile";
+import Central from "../admin/components/inventory/centralstock";
 const AdminRoutes = () => {
   return (
     <Routes>
@@ -82,6 +84,7 @@ const AdminRoutes = () => {
         <Route path="inventory/items/:categoryId/:subcategoryId/edit/:id" element={<ItemForm />} />
         <Route path="inventory/items/:itemId" element={<ItemDetails />} />
         <Route path="inventory/stock-management" element={<Stockmanagement />} />
+        <Route path ="inventory/central" element={<Central/>}/>
 
         <Route path="banners" element={<Banner />} />
         <Route path="banners/create" element={<BannerForm />} />
@@ -153,6 +156,7 @@ const AdminRoutes = () => {
         <Route path="influencer/coupons/edit/:id" element={<InfluencerCouponsForm />} />
         <Route  path="influencer/:id/coupons" element={<InfluencerCouponManage/>}/>
         <Route path="reviews" element={<Reviews/>}/>
+        <Route path="profile" element={<Profile/>}/>
       </Route>
 
       <Route path="*" element={<h1>404 - Page Not Found</h1>} />

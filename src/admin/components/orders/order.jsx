@@ -22,6 +22,11 @@ import {
   RefreshCw,
   Eye,
   AlertCircle,
+  User,
+  CreditCard,
+  MapPin,
+  DollarSign,
+  ShoppingBag,
 } from "lucide-react";
 
 const Orders = () => {
@@ -36,28 +41,24 @@ const Orders = () => {
   const [statusFilter, setStatusFilter] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [orderLoading, setOrderLoading] = useState(false);
   const [orderError, setOrderError] = useState(null);
-
   const [updatingItemId, setUpdatingItemId] = useState(null);
   const [updatingWholeOrder, setUpdatingWholeOrder] = useState(false);
   const [wholeOrderNewStatus, setWholeOrderNewStatus] = useState("");
   const [itemPage, setItemPage] = useState(1);
   const itemLimit = 8;
-
   // Multi-select items for bulk status update
   const [selectedItemIds, setSelectedItemIds] = useState([]);
   const [bulkStatus, setBulkStatus] = useState("");
   const [updatingBulk, setUpdatingBulk] = useState(false);
-
-  // Delivery assignment modal (before marking SHIPPED / OUT_FOR_DELIVERY)
+  // Delivery assignment modal
   const [assignmentModalOpen, setAssignmentModalOpen] = useState(false);
   const [assignmentOrderId, setAssignmentOrderId] = useState(null);
-  const [assignmentMode, setAssignmentMode] = useState("whole"); // "whole" | "items"
+  const [assignmentMode, setAssignmentMode] = useState("whole");
   const [assignmentItemIds, setAssignmentItemIds] = useState([]);
-  const [assignmentItemId, setAssignmentItemId] = useState(null); // kept for openAssignmentModal(param) compatibility
+  const [assignmentItemId, setAssignmentItemId] = useState(null);
   const [pendingNewStatus, setPendingNewStatus] = useState(null);
   const [deliveryAgentsList, setDeliveryAgentsList] = useState([]);
   const [selectedDeliveryAgentId, setSelectedDeliveryAgentId] = useState("");
@@ -187,7 +188,6 @@ const Orders = () => {
     if (!selectedOrder?.orderId || !wholeOrderNewStatus) return;
     const label = statusOptions.find((o) => o.value === wholeOrderNewStatus)?.label || wholeOrderNewStatus;
     const requiresAssignment = STATUS_REQUIRES_ASSIGNMENT.includes(wholeOrderNewStatus);
-
     if (requiresAssignment) {
       try {
         const res = await getAssignmentView(selectedOrder.orderId);
@@ -208,9 +208,7 @@ const Orders = () => {
         return;
       }
     }
-
     if (!window.confirm(`Set all items in this order to "${label}"? (Terminal items like CANCELLED will be skipped.)`)) return;
-
     setUpdatingWholeOrder(true);
     setOrderError(null);
     try {
@@ -246,7 +244,6 @@ const Orders = () => {
     if (!selectedOrder?.orderId || selectedItemIds.length === 0 || !bulkStatus) return;
     const label = statusOptions.find((o) => o.value === bulkStatus)?.label || bulkStatus;
     const requiresAssignment = STATUS_REQUIRES_ASSIGNMENT.includes(bulkStatus);
-
     if (requiresAssignment) {
       try {
         const res = await getAssignmentView(selectedOrder.orderId);
@@ -263,9 +260,7 @@ const Orders = () => {
         return;
       }
     }
-
     if (!window.confirm(`Set ${selectedItemIds.length} selected item(s) to "${label}"?`)) return;
-
     setUpdatingBulk(true);
     setOrderError(null);
     try {
@@ -285,10 +280,8 @@ const Orders = () => {
 
   const handleUpdateItemStatus = async (orderId, itemId, newStatus) => {
     if (!orderId || !itemId || !newStatus) return;
-
     const stringItemId = String(itemId);
     const requiresAssignment = STATUS_REQUIRES_ASSIGNMENT.includes(newStatus);
-
     if (requiresAssignment) {
       try {
         const res = await getAssignmentView(orderId);
@@ -311,14 +304,11 @@ const Orders = () => {
       const label = statusOptions.find((o) => o.value === newStatus)?.label || newStatus;
       if (!window.confirm(`Update to "${label}"?`)) return;
     }
-
     setUpdatingItemId(stringItemId);
-
     const prevItem = selectedOrder?.items?.find(
       (it) => String(it.itemId || it._id) === stringItemId
     );
     const prevStatus = prevItem?.status;
-
     setSelectedOrder((prev) => {
       if (!prev) return prev;
       return {
@@ -330,7 +320,6 @@ const Orders = () => {
         ),
       };
     });
-
     try {
       const payload = { status: newStatus };
       await updateOrderItemStatus(orderId, itemId, payload);
@@ -338,7 +327,6 @@ const Orders = () => {
       console.error("Status update failed:", err);
       const msg = typeof err === "string" ? err : err?.response?.data?.message || "Failed to update item status.";
       alert(msg);
-
       if (prevStatus) {
         setSelectedOrder((prev) => {
           if (!prev) return prev;
@@ -360,9 +348,8 @@ const Orders = () => {
   const getStatusBadge = (status = "pending") => {
     let s = (status || "pending")
       .toUpperCase()
-      .replace(/_/g, " ")           // exchange_requested → EXCHANGE REQUESTED
+      .replace(/_/g, " ")
       .trim();
-
     const statusStyles = {
       PENDING: { bg: "bg-yellow-100", text: "text-yellow-800", Icon: Clock },
       CREATED: { bg: "bg-yellow-100", text: "text-yellow-800", Icon: Clock },
@@ -383,11 +370,8 @@ const Orders = () => {
       "EXCHANGE DELIVERED": { bg: "bg-green-100", text: "text-green-800", Icon: CheckCircle },
       "EXCHANGE COMPLETED": { bg: "bg-green-100", text: "text-green-800", Icon: CheckCircle },
     };
-
     const { bg = "bg-gray-100", text = "text-gray-800", Icon = Clock } =
       statusStyles[s] || statusStyles.PENDING;
-
-    // Shorten very long statuses for better display
     let displayText = s.charAt(0) + s.slice(1).toLowerCase();
     if (displayText.length > 24) {
       displayText = displayText
@@ -395,7 +379,6 @@ const Orders = () => {
         .replace("Pickup Scheduled", "Pickup Sch.")
         .replace("Out For Delivery", "Out for Del.");
     }
-
     return (
       <span
         className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs sm:text-sm font-medium ${bg} ${text} max-w-full truncate`}
@@ -406,7 +389,6 @@ const Orders = () => {
     );
   };
 
-  // Backend ORDER_STATUS_ENUM – value must match exactly for API
   const statusOptions = [
     { value: "CREATED", label: "Created" },
     { value: "CONFIRMED", label: "Confirmed" },
@@ -428,7 +410,7 @@ const Orders = () => {
   ];
 
   return (
-    <div className="min-h-screen px-4 py-6 sm:px-6 lg:px-8">
+    <div className="min-h-screen px-4 py-6 sm:px-6 lg:px-8 ">
       <div className="mx-auto max-w-7xl">
         {/* Header + Search */}
         <div className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
@@ -539,8 +521,6 @@ const Orders = () => {
                 )}
               </tbody>
             </table>
-
-            {/* Pagination */}
             <div className="flex items-center justify-between border-t border-gray-200 px-5 py-4">
               <div className="text-sm text-gray-700">
                 Page <span className="font-medium">{pagination.page}</span> of{" "}
@@ -565,8 +545,8 @@ const Orders = () => {
             </div>
           </div>
         ) : (
-          /* Single Order View */
-          <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+          <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
+            {/* Header */}
             <div className="border-b bg-gray-50 px-6 py-5">
               <button
                 onClick={() => {
@@ -575,25 +555,39 @@ const Orders = () => {
                   setSelectedItemIds([]);
                   setBulkStatus("");
                 }}
-                className="mb-2 text-sm font-medium text-indigo-600 hover:text-indigo-800 flex items-center gap-1"
+                className="mb-3 text-sm font-medium text-indigo-600 hover:text-indigo-800 flex items-center gap-1.5"
               >
-                ← Back to orders
+                ← Back to orders list
               </button>
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <h2 className="text-xl font-bold text-gray-900 sm:text-2xl">
-                  Order #{selectedOrder.orderId}
-                </h2>
-                <div className="flex flex-wrap items-center gap-3">
-                  {getStatusBadge(selectedOrder.status || selectedOrder.orderStatus)}
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-gray-600 whitespace-nowrap">Update all items to:</span>
+
+              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900">
+                    Order #{selectedOrder?.orderId || "—"}
+                  </h2>
+                  <p className="text-sm text-gray-600 mt-1 flex items-center gap-2">
+                    <Clock size={16} />
+                    {new Date(selectedOrder?.createdAt).toLocaleString("en-IN", {
+                      dateStyle: "medium",
+                      timeStyle: "short",
+                    })}
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-4">
+                  {getStatusBadge(selectedOrder?.status)}
+
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <label className="text-sm text-gray-700 whitespace-nowrap">
+                      Update all items:
+                    </label>
                     <select
                       value={wholeOrderNewStatus}
                       onChange={(e) => setWholeOrderNewStatus(e.target.value)}
                       disabled={updatingWholeOrder}
-                      className="rounded border border-gray-300 px-3 py-1.5 text-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:opacity-60"
+                      className="min-w-[160px] rounded border border-gray-300 px-3 py-1.5 text-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:opacity-60"
                     >
-                      <option value="">Select status</option>
+                      <option value="">Select status…</option>
                       {statusOptions.map((opt) => (
                         <option key={opt.value} value={opt.value}>
                           {opt.label}
@@ -601,18 +595,17 @@ const Orders = () => {
                       ))}
                     </select>
                     <button
-                      type="button"
                       onClick={handleUpdateWholeOrderStatus}
                       disabled={updatingWholeOrder || !wholeOrderNewStatus}
-                      className="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-1.5"
+                      className="rounded-lg bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60 flex items-center gap-2"
                     >
                       {updatingWholeOrder ? (
                         <>
                           <RefreshCw size={14} className="animate-spin" />
-                          Updating…
+                          Applying…
                         </>
                       ) : (
-                        "Apply"
+                        "Apply to all"
                       )}
                     </button>
                   </div>
@@ -621,191 +614,282 @@ const Orders = () => {
             </div>
 
             {orderError && (
-              <div className="mx-6 mt-4 rounded-lg bg-red-50 p-4 text-red-700 flex items-center gap-2">
+              <div className="mx-6 mt-5 rounded-lg bg-red-50 p-4 text-red-700 flex items-center gap-3">
                 <AlertCircle size={20} />
                 {orderError}
               </div>
             )}
 
-            <div className="px-6 pb-8">
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                <h3 className="text-lg font-semibold text-gray-800">Order Items</h3>
-                {selectedOrder?.items?.length > 0 && (
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-gray-600">
-                      {selectedItemIds.length > 0 ? `${selectedItemIds.length} selected` : "Select items for bulk update"}
-                    </span>
-                    <select
-                      value={bulkStatus}
-                      onChange={(e) => setBulkStatus(e.target.value)}
-                      disabled={updatingBulk || selectedItemIds.length === 0}
-                      className="rounded border border-gray-300 px-3 py-1.5 text-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:opacity-60"
-                    >
-                      <option value="">Update selected to…</option>
-                      {statusOptions.map((opt) => (
-                        <option key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
+            <div className="p-6 space-y-8">
+              {/* Summary Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="bg-gray-50 p-5 rounded-lg border border-gray-200">
+                  <div className="flex items-center gap-2 mb-3">
+                    <User size={18} className="text-indigo-600" />
+                    <h4 className="text-sm font-semibold text-gray-700">Customer</h4>
+                  </div>
+                  <div className="space-y-2 text-sm">
+                    <p><strong>Name:</strong> {selectedOrder?.userId?.name || "—"}</p>
+                    <p><strong>Phone:</strong> {selectedOrder?.userId?.countryCode || ""}{selectedOrder?.userId?.phoneNumber || "—"}</p>
+                    <p><strong>Email:</strong> {selectedOrder?.userId?.email || "—"}</p>
+                  </div>
+                </div>
+
+                <div className="bg-gray-50 p-5 rounded-lg border border-gray-200">
+                  <div className="flex items-center gap-2 mb-3">
+                    <CreditCard size={18} className="text-indigo-600" />
+                    <h4 className="text-sm font-semibold text-gray-700">Payment</h4>
+                  </div>
+                  <div className="space-y-2 text-sm">
+                    <p>
+                      <strong>Mode:</strong>{" "}
+                      <span className={selectedOrder?.payment?.mode === "COD" ? "text-orange-700 font-medium" : ""}>
+                        {selectedOrder?.payment?.mode || "—"}
+                      </span>
+                    </p>
+                    <p>
+                      <strong>Status:</strong>{" "}
+                      <span className={
+                        selectedOrder?.payment?.status === "SUCCESS" ? "text-green-700 font-medium" :
+                        selectedOrder?.payment?.status === "PENDING" ? "text-amber-700 font-medium" :
+                        "text-red-700 font-medium"
+                      }>
+                        {selectedOrder?.payment?.status || "—"}
+                      </span>
+                    </p>
+                    <p><strong>Amount:</strong> ₹{(selectedOrder?.payment?.amount || 0).toLocaleString("en-IN")}</p>
+                  </div>
+                </div>
+
+                <div className="bg-gray-50 p-5 rounded-lg border border-gray-200">
+                  <div className="flex items-center gap-2 mb-3">
+                    <MapPin size={18} className="text-indigo-600" />
+                    <h4 className="text-sm font-semibold text-gray-700">Delivery Address</h4>
+                  </div>
+                  <div className="text-sm space-y-1">
+                    <p className="font-medium">{selectedOrder?.address?.name || "—"}</p>
+                    <p>{selectedOrder?.address?.fullAddress || "—"}</p>
+                    <p>Pincode: {selectedOrder?.address?.pincode || "—"}</p>
+                    <p>Phone: {selectedOrder?.address?.phone || "—"}</p>
+                  </div>
+                </div>
+
+                <div className="bg-gray-50 p-5 rounded-lg border border-gray-200">
+                  <div className="flex items-center gap-2 mb-3">
+                    <DollarSign size={18} className="text-indigo-600" />
+                    <h4 className="text-sm font-semibold text-gray-700">Pricing</h4>
+                  </div>
+                  <div className="text-sm space-y-1">
+                    <p>Subtotal: ₹{(selectedOrder?.pricing?.subTotal || 0).toLocaleString("en-IN")}</p>
+                    <p>Delivery: ₹{(selectedOrder?.pricing?.delivery?.totalCharge || 0).toLocaleString("en-IN")}</p>
+                    <p>GST: ₹{(selectedOrder?.pricing?.gst?.totalGst || 0).toLocaleString("en-IN")}</p>
+                    <p className="font-bold text-base pt-2 border-t mt-2">
+                      Final Payable: ₹{(selectedOrder?.pricing?.finalPayable || 0).toLocaleString("en-IN")}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {selectedOrder?.shipments?.length > 0 && (
+                <div className="bg-gray-50 p-5 rounded-lg border border-gray-200">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Truck size={18} className="text-indigo-600" />
+                    <h4 className="text-sm font-semibold text-gray-700">Shipments / Warehouses</h4>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    {selectedOrder.shipments.map((ship, idx) => (
+                      <div key={idx} className="p-4 bg-white rounded border shadow-sm">
+                        <p className="font-medium mb-1">{ship.shipmentGroupId}</p>
+                        <p>Warehouse: {ship.warehouseId?.name || "—"} ({ship.warehouseId?.code || "—"})</p>
+                        <p>Status: <span className="font-medium">{ship.status}</span></p>
+                        <p>Type: {ship.deliveryType}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-5">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <h3 className="text-xl font-semibold text-gray-900 flex items-center gap-2">
+                    <ShoppingBag size={20} />
+                    Order Items ({selectedOrder?.totalQuantity || selectedOrder?.items?.length || 0})
+                  </h3>
+
+                  {selectedOrder?.items?.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-3">
+                      <span className="text-sm text-gray-600">
+                        {selectedItemIds.length > 0 ? `${selectedItemIds.length} selected` : "Bulk actions"}
+                      </span>
+                      <select
+                        value={bulkStatus}
+                        onChange={(e) => setBulkStatus(e.target.value)}
+                        disabled={updatingBulk || selectedItemIds.length === 0}
+                        className="min-w-[180px] rounded border border-gray-300 px-3 py-1.5 text-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:opacity-60"
+                      >
+                        <option value="">Update selected to…</option>
+                        {statusOptions.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={handleUpdateSelectedItemsStatus}
+                        disabled={updatingBulk || selectedItemIds.length === 0 || !bulkStatus}
+                        className="rounded-lg bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60 flex items-center gap-2"
+                      >
+                        {updatingBulk ? (
+                          <>
+                            <RefreshCw size={14} className="animate-spin" />
+                            Updating…
+                          </>
+                        ) : (
+                          "Apply bulk"
+                        )}
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {orderLoading ? (
+                  <div className="py-12 text-center text-gray-500">Loading items…</div>
+                ) : !selectedOrder?.items?.length ? (
+                  <div className="py-12 text-center text-gray-500">No items found</div>
+                ) : (
+                  <div className="overflow-x-auto rounded-lg border border-gray-200">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-3.5 text-left">
+                            <input
+                              type="checkbox"
+                              checked={
+                                selectedOrder.items.length > 0 &&
+                                selectedOrder.items.every((it) =>
+                                  selectedItemIds.includes(String(it.itemId || it._id))
+                                )
+                              }
+                              onChange={selectAllOnPage}
+                              className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                            />
+                          </th>
+                          <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Product</th>
+                          <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Qty</th>
+                          <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Price</th>
+                          <th className="px-5 py-3.5 min-w-[160px] text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Status</th>
+                          <th className="px-5 py-3.5 text-center text-xs font-semibold uppercase tracking-wider text-gray-600">Change Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100 bg-white">
+                        {selectedOrder.items.map((item) => {
+                          const itemId = String(item.itemId || item._id);
+                          const isUpdating = updatingItemId === itemId;
+                          const isSelected = selectedItemIds.includes(itemId);
+                          return (
+                            <tr key={itemId} className={`hover:bg-gray-50/60 ${isSelected ? "bg-indigo-50/50" : ""}`}>
+                              <td className="px-4 py-4">
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={() => toggleItemSelection(itemId)}
+                                  className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                />
+                              </td>
+                              <td className="px-5 py-4">
+                                <div className="flex items-center gap-3">
+                                  {item.variant?.imageUrl && (
+                                    <img
+                                      src={item.variant.imageUrl}
+                                      alt={item.sku}
+                                      className="h-12 w-12 rounded object-cover"
+                                    />
+                                  )}
+                                  <div>
+                                    <div className="font-medium text-gray-900">
+                                      {item.sku || item.variant?.sku || "—"}
+                                    </div>
+                                    <div className="mt-0.5 text-xs text-gray-500">
+                                      {item.variant?.color && `Color: ${item.variant.color}`}
+                                      {item.variant?.size && ` • Size: ${item.variant.size}`}
+                                    </div>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="whitespace-nowrap px-5 py-4 text-gray-700">{item.quantity}</td>
+                              <td className="whitespace-nowrap px-5 py-4 font-medium text-gray-900">
+                                ₹{(item.unitPrice || 0).toLocaleString("en-IN")}
+                              </td>
+                              <td className="px-5 py-4 min-w-[160px]">
+                                {getStatusBadge(item.status)}
+                              </td>
+                              <td className="whitespace-nowrap px-5 py-4 text-center">
+                                <div className="relative inline-block">
+                                  <select
+                                    value={item.status || "CREATED"}
+                                    onChange={(e) => {
+                                      const newVal = e.target.value;
+                                      handleUpdateItemStatus(selectedOrder.orderId, itemId, newVal);
+                                    }}
+                                    disabled={isUpdating}
+                                    className={`rounded border border-gray-300 px-3 py-1.5 text-sm focus:border-indigo-500 focus:ring-indigo-500 ${
+                                      isUpdating ? "opacity-60 cursor-wait" : ""
+                                    }`}
+                                  >
+                                    {statusOptions.map((opt) => (
+                                      <option key={opt.value} value={opt.value}>
+                                        {opt.label}
+                                      </option>
+                                    ))}
+                                  </select>
+                                  {isUpdating && (
+                                    <div className="absolute inset-0 flex items-center justify-center bg-white/60 rounded">
+                                      <RefreshCw size={16} className="animate-spin text-indigo-600" />
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {selectedOrder?.itemsPagination?.total > itemLimit && (
+                  <div className="mt-6 flex items-center justify-center gap-4">
                     <button
-                      type="button"
-                      onClick={handleUpdateSelectedItemsStatus}
-                      disabled={updatingBulk || selectedItemIds.length === 0 || !bulkStatus}
-                      className="rounded-lg bg-indigo-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-1.5"
+                      disabled={itemPage <= 1 || orderLoading}
+                      onClick={() => {
+                        setItemPage((p) => Math.max(1, p - 1));
+                        fetchSingleOrder(selectedOrder.orderId);
+                      }}
+                      className="rounded-lg border border-gray-300 px-4 py-2 text-sm disabled:opacity-50 hover:bg-gray-50"
                     >
-                      {updatingBulk ? (
-                        <>
-                          <RefreshCw size={14} className="animate-spin" />
-                          Updating…
-                        </>
-                      ) : (
-                        "Update selected"
-                      )}
+                      Previous
+                    </button>
+                    <span className="text-sm text-gray-700">
+                      Page {itemPage} of {selectedOrder.itemsPagination?.totalPages || 1}
+                    </span>
+                    <button
+                      disabled={itemPage >= (selectedOrder.itemsPagination?.totalPages || 1) || orderLoading}
+                      onClick={() => {
+                        setItemPage((p) => p + 1);
+                        fetchSingleOrder(selectedOrder.orderId);
+                      }}
+                      className="rounded-lg border border-gray-300 px-4 py-2 text-sm disabled:opacity-50 hover:bg-gray-50"
+                    >
+                      Next
                     </button>
                   </div>
                 )}
               </div>
-
-              {orderLoading ? (
-                <div className="py-12 text-center text-gray-500">Loading items…</div>
-              ) : !selectedOrder?.items?.length ? (
-                <div className="py-12 text-center text-gray-500">No items found</div>
-              ) : (
-                <div className="overflow-x-auto rounded-lg border border-gray-200">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-4 py-3.5 text-left">
-                          <input
-                            type="checkbox"
-                            checked={
-                              selectedOrder.items.length > 0 &&
-                              selectedOrder.items.every((it) =>
-                                selectedItemIds.includes(String(it.itemId || it._id))
-                              )
-                            }
-                            onChange={selectAllOnPage}
-                            className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                          />
-                        </th>
-                        <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Product</th>
-                        <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Qty</th>
-                        <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Price</th>
-                        <th className="px-5 py-3.5 min-w-[160px] text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Status</th>
-                        <th className="px-5 py-3.5 text-center text-xs font-semibold uppercase tracking-wider text-gray-600">Change Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100 bg-white">
-                      {selectedOrder.items.map((item) => {
-                        const itemId = String(item.itemId || item._id);
-                        const isUpdating = updatingItemId === itemId;
-                        const isSelected = selectedItemIds.includes(itemId);
-
-                        return (
-                          <tr key={itemId} className={`hover:bg-gray-50/60 ${isSelected ? "bg-indigo-50/50" : ""}`}>
-                            <td className="px-4 py-4">
-                              <input
-                                type="checkbox"
-                                checked={isSelected}
-                                onChange={() => toggleItemSelection(itemId)}
-                                className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                              />
-                            </td>
-                            <td className="px-5 py-4">
-                              <div className="flex items-center gap-3">
-                                {item.variant?.imageUrl && (
-                                  <img
-                                    src={item.variant.imageUrl}
-                                    alt={item.sku}
-                                    className="h-12 w-12 rounded object-cover"
-                                  />
-                                )}
-                                <div>
-                                  <div className="font-medium text-gray-900">
-                                    {item.sku || item.variant?.sku || "—"}
-                                  </div>
-                                  <div className="mt-0.5 text-xs text-gray-500">
-                                    {item.variant?.color && `Color: ${item.variant.color}`}
-                                    {item.variant?.size && ` • Size: ${item.variant.size}`}
-                                  </div>
-                                </div>
-                              </div>
-                            </td>
-                            <td className="whitespace-nowrap px-5 py-4 text-gray-700">{item.quantity}</td>
-                            <td className="whitespace-nowrap px-5 py-4 font-medium text-gray-900">
-                              ₹{(item.unitPrice || 0).toLocaleString("en-IN")}
-                            </td>
-                            <td className="px-5 py-4 min-w-[160px]">
-                              {getStatusBadge(item.status)}
-                            </td>
-                            <td className="whitespace-nowrap px-5 py-4 text-center">
-                              <div className="relative inline-block">
-                                <select
-                                  value={item.status || "CREATED"}
-                                  onChange={(e) => {
-                                    const newVal = e.target.value;
-                                    handleUpdateItemStatus(selectedOrder.orderId, itemId, newVal);
-                                  }}
-                                  disabled={isUpdating}
-                                  className={`rounded border border-gray-300 px-3 py-1.5 text-sm focus:border-indigo-500 focus:ring-indigo-500 ${
-                                    isUpdating ? "opacity-60 cursor-wait" : ""
-                                  }`}
-                                >
-                                  {statusOptions.map((opt) => (
-                                    <option key={opt.value} value={opt.value}>
-                                      {opt.label}
-                                    </option>
-                                  ))}
-                                </select>
-
-                                {isUpdating && (
-                                  <div className="absolute inset-0 flex items-center justify-center bg-white/60 rounded">
-                                    <RefreshCw size={16} className="animate-spin text-indigo-600" />
-                                  </div>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-
-              {selectedOrder?.itemsPagination?.total > itemLimit && (
-                <div className="mt-6 flex items-center justify-center gap-4">
-                  <button
-                    disabled={itemPage <= 1 || orderLoading}
-                    onClick={() => {
-                      setItemPage((p) => Math.max(1, p - 1));
-                      fetchSingleOrder(selectedOrder.orderId);
-                    }}
-                    className="rounded-lg border border-gray-300 px-4 py-2 text-sm disabled:opacity-50 hover:bg-gray-50"
-                  >
-                    Previous
-                  </button>
-                  <span className="text-sm text-gray-700">
-                    Page {itemPage} of {selectedOrder.itemsPagination?.totalPages || 1}
-                  </span>
-                  <button
-                    disabled={itemPage >= (selectedOrder.itemsPagination?.totalPages || 1) || orderLoading}
-                    onClick={() => {
-                      setItemPage((p) => p + 1);
-                      fetchSingleOrder(selectedOrder.orderId);
-                    }}
-                    className="rounded-lg border border-gray-300 px-4 py-2 text-sm disabled:opacity-50 hover:bg-gray-50"
-                  >
-                    Next
-                  </button>
-                </div>
-              )}
             </div>
           </div>
         )}
 
-        {/* Delivery assignment modal: assign driver before marking SHIPPED / OUT_FOR_DELIVERY */}
+        {/* Assignment Modal */}
         {assignmentModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
             <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">

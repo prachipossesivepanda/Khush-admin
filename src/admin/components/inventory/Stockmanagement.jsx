@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { PackageSearch, Warehouse as WarehouseIcon } from "lucide-react";
 import {
   getWarehouses,
@@ -12,34 +12,38 @@ export default function Stockmanagement() {
   const [warehousesLoading, setWarehousesLoading] = useState(true);
   const [warehousesError, setWarehousesError] = useState(null);
 
+  const updateFormRef = useRef(null);
+
   const [selectedWarehouseId, setSelectedWarehouseId] = useState("");
   const [selectedWarehouse, setSelectedWarehouse] = useState(null);
 
+  // ── Warehouse Stock ────────────────────────────────────────────────
   const [stock, setStock] = useState([]);
   const [stockLoading, setStockLoading] = useState(false);
   const [stockError, setStockError] = useState(null);
-
   const [stockSearch, setStockSearch] = useState("");
   const [stockPage, setStockPage] = useState(1);
   const STOCK_PAGE_SIZE = 15;
+  const [stockTotalPages, setStockTotalPages] = useState(1);
 
+  // ── Add Stock: Items + SKUs catalog ────────────────────────────────
+  const [itemSkuRows, setItemSkuRows] = useState([]);
+  const [itemSkuLoading, setItemSkuLoading] = useState(false);
+  const [itemSkuError, setItemSkuError] = useState(null);
+  const [itemSearch, setItemSearch] = useState("");
+  const [itemPage, setItemPage] = useState(1);
+  const ITEM_PAGE_SIZE = 10;
+  const [itemTotalPages, setItemTotalPages] = useState(1);
+
+  // Form for updating/adding stock
   const [stockForm, setStockForm] = useState({
     sku: "",
     quantity: "",
   });
   const [updatingStock, setUpdatingStock] = useState(false);
 
-  // Items + SKUs list for adding new stock
-  const [itemSkuRows, setItemSkuRows] = useState([]);
-  const [itemSkuLoading, setItemSkuLoading] = useState(false);
-  const [itemSkuError, setItemSkuError] = useState(null);
-  const [itemPage, setItemPage] = useState(1);
-  const [itemTotalPages, setItemTotalPages] = useState(1);
-  const [itemSearch, setItemSearch] = useState("");
-  const ITEM_PAGE_SIZE = 10;
-
   // ────────────────────────────────────────────────
-  // Load warehouses for selection
+  // Load warehouses (once)
   // ────────────────────────────────────────────────
   useEffect(() => {
     const fetchWarehouses = async () => {
@@ -65,10 +69,8 @@ export default function Stockmanagement() {
         setWarehouses(formatted);
         setWarehousesError(null);
       } catch (err) {
-        console.error("Failed to load warehouses for stock management:", err);
-        setWarehousesError(
-          err?.response?.data?.message || "Failed to load warehouses",
-        );
+        console.error("Failed to load warehouses:", err);
+        setWarehousesError(err?.response?.data?.message || "Failed to load warehouses");
       } finally {
         setWarehousesLoading(false);
       }
@@ -78,9 +80,14 @@ export default function Stockmanagement() {
   }, []);
 
   // ────────────────────────────────────────────────
-  // Load items with SKUs (for adding new stock)
+  // Load items + SKUs (backend search + pagination)
   // ────────────────────────────────────────────────
   useEffect(() => {
+    if (!itemSearch && itemPage === 1 && itemSkuRows.length > 0) {
+      // optional: prevent unnecessary reload on mount if we already have data
+      return;
+    }
+
     const fetchItemsWithSkus = async () => {
       setItemSkuLoading(true);
       setItemSkuError(null);
@@ -89,9 +96,11 @@ export default function Stockmanagement() {
         const response = await getItemsWithSkus(
           itemPage,
           ITEM_PAGE_SIZE,
-          1,
-          50,
+          1,           // assuming this is some level/minimum SKU count or similar
+          50,          // assuming this is max SKUs per item or similar
+          itemSearch   // ← search term sent to backend
         );
+
         const data = response?.data?.data || response?.data || {};
         const items = data.items || data || [];
 
@@ -115,25 +124,24 @@ export default function Stockmanagement() {
         setItemTotalPages(pagination.totalPages || pagination.pages || 1);
       } catch (err) {
         console.error("Failed to load items with SKUs:", err);
-        setItemSkuError(
-          err?.response?.data?.message || "Failed to load items for stock",
-        );
+        setItemSkuError(err?.response?.data?.message || "Failed to load items/SKUs");
       } finally {
         setItemSkuLoading(false);
       }
     };
 
     fetchItemsWithSkus();
-  }, [itemPage]);
+  }, [itemPage, itemSearch]);
 
   // ────────────────────────────────────────────────
-  // Load stock when warehouse changes
+  // Load warehouse stock (backend search + pagination)
   // ────────────────────────────────────────────────
   useEffect(() => {
     if (!selectedWarehouseId) {
       setSelectedWarehouse(null);
       setStock([]);
       setStockError(null);
+      setStockTotalPages(1);
       return;
     }
 
@@ -143,15 +151,24 @@ export default function Stockmanagement() {
     const fetchStock = async () => {
       setStockLoading(true);
       setStockError(null);
+
       try {
-        const response = await getWarehouseStock(selectedWarehouseId, 1, 500);
+        const response = await getWarehouseStock(
+          selectedWarehouseId,
+          stockPage,
+          STOCK_PAGE_SIZE,
+          stockSearch
+        );
+
         const data = response?.data?.data || response?.data || {};
         setStock(data.stock || data.items || data || []);
+
+        const pagination = data.pagination || {};
+        setStockTotalPages(pagination.totalPages || pagination.pages || 1);
       } catch (err) {
         console.error("Failed to load warehouse stock:", err);
         setStockError(
-          err?.response?.data?.message ||
-            "Failed to load stock for this warehouse",
+          err?.response?.data?.message || "Failed to load stock for this warehouse"
         );
       } finally {
         setStockLoading(false);
@@ -159,40 +176,7 @@ export default function Stockmanagement() {
     };
 
     fetchStock();
-  }, [selectedWarehouseId, warehouses]);
-
-  // ────────────────────────────────────────────────
-  // Derived - filtered stock by search term
-  // ────────────────────────────────────────────────
-  const filteredStock = useMemo(() => {
-    if (!stockSearch.trim()) return stock;
-    const term = stockSearch.toLowerCase().trim();
-
-    return stock.filter((item) =>
-      `${item.sku || ""} ${item.productName || ""} ${item.name || ""}`
-        .toLowerCase()
-        .includes(term),
-    );
-  }, [stock, stockSearch]);
-
-  const paginatedStock = useMemo(() => {
-    const start = (stockPage - 1) * STOCK_PAGE_SIZE;
-    return filteredStock.slice(start, start + STOCK_PAGE_SIZE);
-  }, [filteredStock, stockPage]);
-
-  const stockTotalPages = Math.max(
-    1,
-    Math.ceil((filteredStock.length || 1) / STOCK_PAGE_SIZE),
-  );
-
-  const filteredItemSkuRows = useMemo(() => {
-    if (!itemSearch.trim()) return itemSkuRows;
-    const term = itemSearch.toLowerCase().trim();
-
-    return itemSkuRows.filter((row) =>
-      `${row.itemName || ""} ${row.sku || ""}`.toLowerCase().includes(term),
-    );
-  }, [itemSkuRows, itemSearch]);
+  }, [selectedWarehouseId, warehouses, stockPage, stockSearch]);
 
   // ────────────────────────────────────────────────
   // Handlers
@@ -212,6 +196,7 @@ export default function Stockmanagement() {
       ...prev,
       sku: item.sku || item.SKU || prev.sku,
     }));
+    updateFormRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
   };
 
   const handleUpdateStock = async () => {
@@ -232,10 +217,17 @@ export default function Stockmanagement() {
     try {
       await updateWarehouseStock(selectedWarehouseId, { sku, quantity });
 
-      // Refresh stock list
-      const response = await getWarehouseStock(selectedWarehouseId, 1, 500);
+      // Refresh current page (or go to page 1)
+      const response = await getWarehouseStock(
+        selectedWarehouseId,
+        1,
+        STOCK_PAGE_SIZE,
+        stockSearch
+      );
       const data = response?.data?.data || response?.data || {};
       setStock(data.stock || data.items || data || []);
+      setStockPage(1);
+      setStockTotalPages(data.pagination?.totalPages || 1);
 
       setStockForm({ sku: "", quantity: "" });
     } catch (err) {
@@ -290,9 +282,7 @@ export default function Stockmanagement() {
               className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm focus:border-black focus:ring-1 focus:ring-black disabled:bg-gray-100"
             >
               <option value="">
-                {warehousesLoading
-                  ? "Loading warehouses..."
-                  : "Select warehouse"}
+                {warehousesLoading ? "Loading warehouses..." : "Select warehouse"}
               </option>
               {warehouses.map((wh) => (
                 <option key={wh.id} value={wh.id}>
@@ -307,14 +297,15 @@ export default function Stockmanagement() {
         </div>
 
         {/* Update stock form */}
-        <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5 space-y-4">
+        <div
+          ref={updateFormRef}
+          className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5 space-y-4"
+        >
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
             <h2 className="text-base sm:text-lg font-semibold text-gray-900">
-              Update SKU Stock
+              Update / Add SKU Stock
             </h2>
-            <p className="text-xs text-gray-500">
-              POST {`/warehouse/:warehouseId/stock`}
-            </p>
+            <p className="text-xs text-gray-500">POST /warehouse/:warehouseId/stock</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -346,6 +337,7 @@ export default function Stockmanagement() {
               {updatingStock ? "Updating..." : "Update Stock"}
             </button>
           </div>
+
           {!selectedWarehouseId && (
             <p className="text-xs text-amber-600">
               Select a warehouse first to update its stock.
@@ -353,7 +345,7 @@ export default function Stockmanagement() {
           )}
         </div>
 
-        {/* Stock list and search */}
+        {/* Warehouse Stock Table */}
         <div className="bg-white border border-gray-200 rounded-xl shadow-sm">
           <div className="border-b border-gray-100 px-4 sm:px-5 py-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
@@ -361,8 +353,7 @@ export default function Stockmanagement() {
                 Warehouse Stock
               </h2>
               <p className="text-xs text-gray-500">
-                Search by SKU or product name and click a row to autofill the
-                SKU.
+                Search by SKU or product name • click row to autofill SKU
               </p>
             </div>
             <div className="relative w-full sm:w-72">
@@ -373,7 +364,10 @@ export default function Stockmanagement() {
                 type="text"
                 placeholder="Search SKU or product..."
                 value={stockSearch}
-                onChange={(e) => setStockSearch(e.target.value)}
+                onChange={(e) => {
+                  setStockSearch(e.target.value);
+                  setStockPage(1);
+                }}
                 className="w-full rounded-lg border border-gray-300 bg-white pl-9 pr-3 py-2.5 text-sm focus:border-black focus:ring-1 focus:ring-black"
               />
             </div>
@@ -381,24 +375,18 @@ export default function Stockmanagement() {
 
           <div className="overflow-hidden rounded-b-xl">
             {stockLoading ? (
-              <div className="py-10 text-center text-sm text-gray-500">
-                Loading stock...
-              </div>
+              <div className="py-10 text-center text-sm text-gray-500">Loading stock...</div>
             ) : stockError ? (
-              <div className="py-10 text-center text-sm text-red-600">
-                {stockError}
-              </div>
+              <div className="py-10 text-center text-sm text-red-600">{stockError}</div>
             ) : !selectedWarehouseId ? (
               <div className="py-10 text-center text-sm text-gray-500">
                 Select a warehouse to view its stock.
               </div>
-            ) : !stock.length ? (
+            ) : stock.length === 0 ? (
               <div className="py-10 text-center text-sm text-gray-500">
-                No stock records found for this warehouse yet.
-              </div>
-            ) : !filteredStock.length ? (
-              <div className="py-10 text-center text-sm text-gray-500">
-                No items match your search.
+                {stockSearch.trim()
+                  ? "No matching stock records found."
+                  : "No stock records in this warehouse yet."}
               </div>
             ) : (
               <>
@@ -418,7 +406,7 @@ export default function Stockmanagement() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {paginatedStock.map((item) => (
+                      {stock.map((item) => (
                         <tr
                           key={item._id || item.id || item.sku}
                           className="hover:bg-gray-50 cursor-pointer"
@@ -434,17 +422,14 @@ export default function Stockmanagement() {
                             <div className="flex items-center justify-end gap-2">
                               <span
                                 className={`${
-                                  (item.quantity ?? 0) < 10
-                                    ? "text-red-600"
-                                    : "text-gray-900"
+                                  (item.quantity ?? 0) < 10 ? "text-red-600" : "text-gray-900"
                                 }`}
                               >
                                 {item.quantity ?? 0}
                               </span>
-
                               {(item.quantity ?? 0) < 10 && (
                                 <span className="px-2 py-0.5 text-xs font-medium text-red-700 bg-red-100 rounded-full">
-                                  Low Stock
+                                  Low
                                 </span>
                               )}
                             </div>
@@ -454,13 +439,13 @@ export default function Stockmanagement() {
                     </tbody>
                   </table>
                 </div>
+
                 <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-t border-gray-100 text-xs sm:text-sm text-gray-600">
                   <span>
                     Page {stockPage} of {stockTotalPages}
                   </span>
                   <div className="flex items-center gap-2">
                     <button
-                      type="button"
                       onClick={() => setStockPage((p) => Math.max(1, p - 1))}
                       disabled={stockPage === 1}
                       className="px-3 py-1.5 border rounded disabled:opacity-50 hover:bg-gray-50"
@@ -468,10 +453,7 @@ export default function Stockmanagement() {
                       Prev
                     </button>
                     <button
-                      type="button"
-                      onClick={() =>
-                        setStockPage((p) => Math.min(stockTotalPages, p + 1))
-                      }
+                      onClick={() => setStockPage((p) => Math.min(stockTotalPages, p + 1))}
                       disabled={stockPage >= stockTotalPages}
                       className="px-3 py-1.5 border rounded disabled:opacity-50 hover:bg-gray-50"
                     >
@@ -484,16 +466,15 @@ export default function Stockmanagement() {
           </div>
         </div>
 
-        {/* Item + SKU picker for adding new stock */}
+        {/* All Items & SKUs */}
         <div className="bg-white border border-gray-200 rounded-xl shadow-sm">
           <div className="border-b border-gray-100 px-4 sm:px-5 py-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-sm sm:text-base font-semibold text-gray-900">
-                All Items &amp; SKUs
+                Catalog – Items & SKUs
               </h2>
               <p className="text-xs text-gray-500">
-                Browse catalog SKUs and click a row to copy the SKU into the
-                update form.
+                Search items/SKUs • click to copy SKU into update form
               </p>
             </div>
             <div className="relative w-full sm:w-72">
@@ -502,10 +483,11 @@ export default function Stockmanagement() {
               </span>
               <input
                 type="text"
-                placeholder="Search item or SKU..."
+                placeholder="Search item name or SKU..."
                 value={itemSearch}
                 onChange={(e) => {
                   setItemSearch(e.target.value);
+                  setItemPage(1);
                 }}
                 className="w-full rounded-lg border border-gray-300 bg-white pl-9 pr-3 py-2.5 text-sm focus:border-black focus:ring-1 focus:ring-black"
               />
@@ -514,20 +496,14 @@ export default function Stockmanagement() {
 
           <div className="overflow-hidden rounded-b-xl">
             {itemSkuLoading ? (
-              <div className="py-10 text-center text-sm text-gray-500">
-                Loading items...
-              </div>
+              <div className="py-10 text-center text-sm text-gray-500">Loading catalog...</div>
             ) : itemSkuError ? (
-              <div className="py-10 text-center text-sm text-red-600">
-                {itemSkuError}
-              </div>
-            ) : !itemSkuRows.length ? (
+              <div className="py-10 text-center text-sm text-red-600">{itemSkuError}</div>
+            ) : itemSkuRows.length === 0 ? (
               <div className="py-10 text-center text-sm text-gray-500">
-                No items found.
-              </div>
-            ) : !filteredItemSkuRows.length ? (
-              <div className="py-10 text-center text-sm text-gray-500">
-                No items match your search.
+                {itemSearch.trim()
+                  ? "No matching items or SKUs found."
+                  : "No items/SKUs available in catalog."}
               </div>
             ) : (
               <>
@@ -544,17 +520,19 @@ export default function Stockmanagement() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                      {filteredItemSkuRows.map((row, idx) => (
+                      {itemSkuRows.map((row, idx) => (
                         <tr
-                          key={`${row.itemId}-${row.sku}-${idx}`}
+                          key={`${row.itemId || "i"}-${row.sku}-${idx}`}
                           className="hover:bg-gray-50 cursor-pointer"
-                          onClick={() =>
-                            setStockForm((prev) => ({ ...prev, sku: row.sku }))
-                          }
+                          onClick={() => {
+                            setStockForm((prev) => ({ ...prev, sku: row.sku }));
+                            updateFormRef.current?.scrollIntoView({
+                              behavior: "smooth",
+                              block: "center",
+                            });
+                          }}
                         >
-                          <td className="px-4 py-3 text-sm text-gray-900">
-                            {row.itemName}
-                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-900">{row.itemName}</td>
                           <td className="px-4 py-3 text-sm font-mono text-gray-700">
                             {row.sku}
                           </td>
@@ -563,13 +541,13 @@ export default function Stockmanagement() {
                     </tbody>
                   </table>
                 </div>
+
                 <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-t border-gray-100 text-xs sm:text-sm text-gray-600">
                   <span>
                     Page {itemPage} of {itemTotalPages}
                   </span>
                   <div className="flex items-center gap-2">
                     <button
-                      type="button"
                       onClick={() => setItemPage((p) => Math.max(1, p - 1))}
                       disabled={itemPage === 1 || itemSkuLoading}
                       className="px-3 py-1.5 border rounded disabled:opacity-50 hover:bg-gray-50"
@@ -577,10 +555,7 @@ export default function Stockmanagement() {
                       Prev
                     </button>
                     <button
-                      type="button"
-                      onClick={() =>
-                        setItemPage((p) => Math.min(itemTotalPages, p + 1))
-                      }
+                      onClick={() => setItemPage((p) => Math.min(itemTotalPages, p + 1))}
                       disabled={itemPage >= itemTotalPages || itemSkuLoading}
                       className="px-3 py-1.5 border rounded disabled:opacity-50 hover:bg-gray-50"
                     >

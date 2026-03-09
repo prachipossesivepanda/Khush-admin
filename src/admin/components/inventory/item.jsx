@@ -85,79 +85,96 @@ export default function Items() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50/70">
-
+    <div className="min-h-screen bg-white text-black scroll-smooth">
       {/* Top Header */}
-      <div className="sticky top-0 bg-white border-b z-50">
-        <div className="px-6 py-6">
-          <h1 className="text-3xl font-bold text-gray-900">Products</h1>
+      <div className="sticky top-0 z-50 border-b border-black/10 bg-white/95 backdrop-blur">
+        <div className="px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-full bg-black text-white flex items-center justify-center text-sm font-semibold">
+              P
+            </div>
+            <div>
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight">
+                Products
+              </h1>
+              <p className="text-xs sm:text-sm text-gray-500">
+                Manage all items inside this subcategory
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={openCreate}
+            className="hidden sm:inline-flex items-center px-4 py-2.5 rounded-full bg-black text-white text-sm font-medium hover:bg-gray-900 transition-colors"
+          >
+            + Add Product
+          </button>
         </div>
-      </div>
 
-      {/* Sticky Controls Section */}
-      <div className="sticky top-[88px] z-40 backdrop-blur">
-        <div className="px-8 py-6">
-          <div className="flex flex-col sm:flex-row items-center gap-4">
+        {/* Sticky Search / Controls Bar */}
+        <div className="border-t border-black/5 bg-white">
+          <div className="px-4 sm:px-6 lg:px-8 py-3">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+              <button
+                onClick={goBackToSubcategory}
+                className="inline-flex items-center justify-center px-4 py-2.5 rounded-full border border-black/10 text-xs sm:text-sm font-medium hover:bg-black hover:text-white transition-colors"
+              >
+                ← Back
+              </button>
 
-            {/* Back Button */}
-            <button
-              onClick={goBackToSubcategory}
-              className="px-4 py-3 border border-gray-300 rounded-xl hover:bg-gray-100 transition"
-            >
-              ← Back
-            </button>
+              <div className="flex-1 relative">
+                <input
+                  value={searchTerm}
+                  onChange={(e) => {
+                    console.log("[Items.jsx] Search term changed:", e.target.value);
+                    setSearchTerm(e.target.value);
+                  }}
+                  placeholder="Search products by name..."
+                  className="w-full pl-10 pr-4 py-2.5 rounded-full border border-black/10 text-sm focus:outline-none focus:ring-2 focus:ring-black/80 focus:border-black/80 bg-white"
+                />
+                <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-gray-400 text-sm">
+                  🔍
+                </span>
+              </div>
 
-            {/* Search */}
-            <input
-              value={searchTerm}
-              onChange={(e) => {
-                console.log("[Items.jsx] Search term changed:", e.target.value);
-                setSearchTerm(e.target.value);
-              }}
-              placeholder="Search products..."
-              className="flex-1 px-5 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-black"
-            />
-
-            {/* Add Product */}
-            <button
-              onClick={openCreate}
-              className="px-6 py-3 bg-black text-white font-medium rounded-xl hover:bg-gray-800 transition"
-            >
-              + Add Product
-            </button>
-
+              <button
+                onClick={openCreate}
+                className="sm:hidden inline-flex items-center justify-center px-4 py-2.5 rounded-full bg-black text-white text-sm font-medium hover:bg-gray-900 transition-colors"
+              >
+                + Add
+              </button>
+            </div>
           </div>
         </div>
       </div>
 
       {/* Table Section */}
-      <div className="px-8 py-8">
-        <div className="bg-white border border-gray-200 rounded-xl shadow-sm max-h-[65vh] overflow-y-auto hide-scrollbar">
-
-          <table className="w-full">
-            <thead className="bg-gray-100 text-xs uppercase text-gray-600 sticky top-0">
+      <div className="px-4 sm:px-6 lg:px-8 py-6">
+        <div className="bg-white border border-black/5 rounded-2xl shadow-sm max-h-[68vh] overflow-y-auto hide-scrollbar scroll-smooth">
+          <table className="w-full text-sm">
+            <thead className="sticky top-0 z-10 bg-black text-white text-[11px] sm:text-xs uppercase tracking-wide">
               <tr>
-                <th className="p-4">#</th>
-                <th className="p-4">Image</th>
-                <th className="p-4 text-left">Name</th>
-                <th className="p-4 text-left">Description</th>
-                <th className="p-4">Price</th>
-                <th className="p-4">Discounted</th>
-                <th className="p-4">Status</th>
-                <th className="p-4 text-right">Actions</th>
+                <th className="px-4 py-3 text-left font-medium">#</th>
+                <th className="px-4 py-3 text-left font-medium">Image</th>
+                <th className="px-4 py-3 text-left font-medium">Name</th>
+                <th className="px-4 py-3 text-left font-medium">Description</th>
+                <th className="px-4 py-3 text-right font-medium">Price</th>
+                <th className="px-4 py-3 text-right font-medium">Discounted</th>
+                <th className="px-4 py-3 text-center font-medium">Status</th>
+                <th className="px-4 py-3 text-right font-medium">Actions</th>
               </tr>
             </thead>
 
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="p-12 text-center text-gray-500">
+                  <td colSpan={8} className="px-4 py-10 text-center text-gray-500 text-sm">
                     Loading products...
                   </td>
                 </tr>
               ) : filteredItems.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="p-12 text-center text-gray-500">
+                  <td colSpan={8} className="px-4 py-10 text-center text-gray-500 text-sm">
                     No products found
                   </td>
                 </tr>
@@ -169,60 +186,63 @@ export default function Items() {
                       console.log("[Items.jsx] Row clicked → view details:", item._id, item.name);
                       navigate(`/admin/inventory/items/${item._id}`);
                     }}
-                    className="border-t hover:bg-gray-50 cursor-pointer transition"
+                    className="border-t border-black/5 hover:bg-black/[0.02] cursor-pointer transition-colors"
                   >
-                    <td className="p-4 text-gray-600">{index + 1}</td>
-
-                    <td className="p-4">
-                      <img
-                        src={
-                          item?.thumbnail ||
-                          "https://via.placeholder.com/50"
-                        }
-                        alt=""
-                        className="h-12 w-12 rounded-lg object-cover border"
-                      />
+                    <td className="px-4 py-3 align-middle text-xs text-gray-500">
+                      {index + 1}
                     </td>
 
-                    <td className="p-4 font-medium text-gray-900">
+                    <td className="px-4 py-3 align-middle">
+                      <div className="h-11 w-11 rounded-lg overflow-hidden border border-black/10 bg-gray-50">
+                        <img
+                          src={item?.thumbnail || "https://via.placeholder.com/50"}
+                          alt={item.name}
+                          className="h-full w-full object-cover"
+                        />
+                      </div>
+                    </td>
+
+                    <td className="px-4 py-3 align-middle font-medium text-sm">
                       {item.name}
                     </td>
 
-                    <td className="p-4 text-sm text-gray-600 max-w-xs truncate">
+                    <td className="px-4 py-3 align-middle text-xs sm:text-sm text-gray-600 max-w-xs truncate">
                       {item.shortDescription || "—"}
                     </td>
 
-                    <td className="p-4 font-medium">₹{item.price}</td>
+                    <td className="px-4 py-3 align-middle text-right text-sm">
+                      ₹{item.price}
+                    </td>
 
-                    <td className="p-4">
+                    <td className="px-4 py-3 align-middle text-right text-sm">
                       {item.discountedPrice ? (
-                        <span className="text-green-600 font-semibold">
+                        <span className="font-semibold">
                           ₹{item.discountedPrice}
                         </span>
                       ) : (
-                        "—"
+                        <span className="text-gray-400">—</span>
                       )}
                     </td>
 
-                    <td className="p-4">
+                    <td className="px-4 py-3 align-middle text-center">
                       {item.isActive ? (
-                        <span className="px-3 py-1 text-xs font-medium rounded-full bg-green-100 text-green-700">
+                        <span className="inline-flex items-center justify-center px-3 py-1 rounded-full text-[11px] font-semibold bg-black text-white">
                           Active
                         </span>
                       ) : (
-                        <span className="px-3 py-1 text-xs font-medium rounded-full bg-red-100 text-red-700">
+                        <span className="inline-flex items-center justify-center px-3 py-1 rounded-full text-[11px] font-semibold border border-black/20 text-gray-700">
                           Inactive
                         </span>
                       )}
                     </td>
 
-                    <td className="p-4 text-right">
+                    <td className="px-4 py-3 align-middle text-right">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           openEdit(item);
                         }}
-                        className="text-indigo-600 hover:text-indigo-800 font-medium"
+                        className="text-xs sm:text-sm font-medium px-3 py-1.5 rounded-full border border-black/20 hover:bg-black hover:text-white transition-colors"
                       >
                         Edit
                       </button>
@@ -236,14 +256,14 @@ export default function Items() {
 
         {/* Pagination */}
         {pagination && (
-          <div className="mt-8 flex justify-center items-center gap-6">
+          <div className="mt-6 flex justify-center items-center gap-4 text-xs sm:text-sm">
             <button
               disabled={pagination.page <= 1}
               onClick={() => {
                 console.log("[Items.jsx] Previous page clicked → page:", pagination.page - 1);
                 fetchItems(pagination.page - 1);
               }}
-              className="px-5 py-2 border rounded-lg disabled:opacity-40 hover:bg-gray-50"
+              className="px-4 py-2 rounded-full border border-black/15 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-black hover:text-white transition-colors"
             >
               Previous
             </button>
@@ -258,7 +278,7 @@ export default function Items() {
                 console.log("[Items.jsx] Next page clicked → page:", pagination.page + 1);
                 fetchItems(pagination.page + 1);
               }}
-              className="px-5 py-2 border rounded-lg disabled:opacity-40 hover:bg-gray-50"
+              className="px-4 py-2 rounded-full border border-black/15 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-black hover:text-white transition-colors"
             >
               Next
             </button>

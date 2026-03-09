@@ -168,9 +168,25 @@ export const getItemsWithSkus = (
   page = 1,
   limit = 10,
   skuPage = 1,
-  skuLimit = 15
+  skuLimit = 15,
+  search = ""
 ) => {
-  const url = `${ITEMS_API.GET_ITEMS_WITH_SKUS}?page=${page}&limit=${limit}&skuPage=${skuPage}&skuLimit=${skuLimit}`;
+
+  const queryParams = new URLSearchParams({
+    page,
+    limit,
+    skuPage,
+    skuLimit,
+  });
+
+  if (search && search.trim()) {
+    queryParams.append("search", search.trim());
+  }
+
+  const url = `${ITEMS_API.GET_ITEMS_WITH_SKUS}?${queryParams.toString()}`;
+
+  console.log("📦 Items SKU API:", url);
+
   return apiConnector("GET", url);
 };
 

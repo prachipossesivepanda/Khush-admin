@@ -202,6 +202,17 @@ const Sidebar = () => {
                   >
                     SubCategories
                   </Link> */}
+
+                  <Link
+                    to="/admin/inventory/central"
+                    className={`block px-4 py-2.5 text-gray-400 hover:bg-white hover:text-black transition-all duration-200 text-sm font-medium ${
+                      location.pathname.includes("/admin/items")
+                        ? "bg-white/10 text-white"
+                        : ""
+                    }`}
+                  >
+                  Central  Stock management
+                  </Link>
                   <Link
                     to="/admin/stocks"
                     className={`block px-4 py-2.5 text-gray-400 hover:bg-white hover:text-black transition-all duration-200 text-sm font-medium ${
@@ -579,6 +590,16 @@ const Sidebar = () => {
               className="text-gray-400 group-hover:text-white"
             />
             <span>Settings</span>
+          </Link>
+          <Link
+            to="/admin/profile"
+            className="flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-white/10 hover:text-white transition-all duration-200 font-medium group mb-2"
+          >
+            <Settings
+              size={20}
+              className="text-gray-400 group-hover:text-white"
+            />
+            <span>Profile</span>
           </Link>
 
           <button
