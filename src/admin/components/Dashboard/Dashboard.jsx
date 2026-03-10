@@ -1,235 +1,187 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getItemsCount, getCategoryCount, getSubcategoryCount } from "../../apis/Dashboardapi";
-import { getFeaturedImages } from "../../apis/Bannerapi";
-import { ZoomIn, X } from "lucide-react";
+import { 
+  getItemsCount, 
+  getCategoryCount, 
+  getSubcategoryCount, 
+  getCouponAnalytics 
+} from "../../apis/Dashboardapi";
+import { FiZoomIn, FiX } from "react-icons/fi";     // cleaner zoom icons
+import { 
+  FiPackage, 
+  FiLayers, 
+  FiTag, 
+  FiGift 
+} from "react-icons/fi";   // subtle icons for cards
 
 export default function Dashboard() {
   const [counts, setCounts] = useState({});
-  const [banners, setBanners] = useState([]);
-  const [loadingBanners, setLoadingBanners] = useState(false);
   const [zoomedImage, setZoomedImage] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
     const fetchCounts = async () => {
       try {
-        const [itemsRes, categoriesRes, subcategoriesRes] = await Promise.all([
+        const [
+          itemsRes,
+          categoriesRes,
+          subcategoriesRes,
+          couponsRes
+        ] = await Promise.all([
           getItemsCount(),
           getCategoryCount(),
-          getSubcategoryCount()
+          getSubcategoryCount(),
+          getCouponAnalytics()
         ]);
 
         setCounts({
           Items: {
-            total: itemsRes.data.items.totalItems,
-            active: itemsRes.data.items.activeItems,
-            inactive: itemsRes.data.items.inactiveItems,
-            path: "/admin/items"
+            total: itemsRes?.data?.items?.totalItems ?? 0,
+            active: itemsRes?.data?.items?.activeItems ?? 0,
+            inactive: itemsRes?.data?.items?.inactiveItems ?? 0,
+            path: "/admin/items",
+            icon: <FiPackage className="w-6 h-6 text-gray-500" />
           },
           Categories: {
-            total: categoriesRes.data.categories.totalCategories,
-            active: categoriesRes.data.categories.activeCategories,
-            inactive: categoriesRes.data.categories.inactiveCategories,
-            path: "/admin/inventory/categories"
+            total: categoriesRes?.data?.categories?.totalCategories ?? 0,
+            active: categoriesRes?.data?.categories?.activeCategories ?? 0,
+            inactive: categoriesRes?.data?.categories?.inactiveCategories ?? 0,
+            path: "/admin/inventory/categories",
+            icon: <FiLayers className="w-6 h-6 text-gray-500" />
           },
           Subcategories: {
-            total: subcategoriesRes.data.subcategories.totalSubCategories,
-            active: subcategoriesRes.data.subcategories.activeSubCategories,
-            inactive: subcategoriesRes.data.subcategories.inactiveSubCategories,
-            path: "/admin/subcategoriess"
+            total: subcategoriesRes?.data?.subcategories?.totalSubCategories ?? 0,
+            active: subcategoriesRes?.data?.subcategories?.activeSubCategories ?? 0,
+            inactive: subcategoriesRes?.data?.subcategories?.inactiveSubCategories ?? 0,
+            path: "/admin/subcategoriess",
+            icon: <FiTag className="w-6 h-6 text-gray-500" />
+          },
+          Coupons: {
+            total: couponsRes?.data?.summary?.totalCoupons ?? 0,
+            active: couponsRes?.data?.summary?.activeCoupons ?? 0,
+            inactive: couponsRes?.data?.summary?.inactiveCoupons ?? 0,
+            path: "/admin/coupons",
+            icon: <FiGift className="w-6 h-6 text-gray-500" />
           }
         });
-
       } catch (err) {
-        console.error("Dashboard count error:", err);
+        console.error("Dashboard fetch error:", err);
       }
     };
 
     fetchCounts();
-    fetchBanners();
   }, []);
 
-  const fetchBanners = async () => {
-    try {
-      setLoadingBanners(true);
-      const response = await getFeaturedImages("", 1, 10);
-      const responseData = response?.data || {};
-      const imagesArray = responseData.data || [];
-      setBanners(Array.isArray(imagesArray) ? imagesArray : []);
-    } catch (err) {
-      console.error("Dashboard banners error:", err);
-    } finally {
-      setLoadingBanners(false);
-    }
-  };
-
-  const cardClass =
-    "bg-white shadow rounded-lg p-6 flex flex-col justify-between w-full sm:w-60 cursor-pointer hover:shadow-lg transition";
-  const cardHeaderClass = "text-lg font-semibold mb-2 text-gray-700";
-  const cardCountClass = "text-3xl font-bold text-gray-900";
-  const statusLabelClass = "text-sm font-medium text-gray-500 mt-1";
-
-  return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <h1 className="text-3xl font-bold mb-6">Dashboard</h1>
-
-      {/* Stats Cards */}
-      <div className="flex flex-wrap gap-6 mb-8">
-        {Object.entries(counts).map(([key, value]) => (
-          <div
-            key={key}
-            className={cardClass}
-            onClick={() => navigate(value.path)}
-          >
-            <div className={cardHeaderClass}>{key}</div>
-            <div className={cardCountClass}>{value.total}</div>
-            <div className="mt-3">
-              <p className={statusLabelClass}>
-                Active: <span className="text-green-600">{value.active}</span>
-              </p>
-              <p className={statusLabelClass}>
-                Inactive: <span className="text-red-600">{value.inactive}</span>
-              </p>
-            </div>
-          </div>
-        ))}
+  const StatCard = ({ title, data }) => (
+    <div
+      onClick={() => navigate(data.path)}
+      className={`
+        group bg-white border border-gray-200 rounded-xl p-6 
+        shadow-sm hover:shadow-md hover:border-gray-300 
+        transition-all duration-200 cursor-pointer
+      `}
+    >
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-medium text-gray-700 group-hover:text-gray-900 transition-colors">
+          {title}
+        </h3>
+        {data.icon}
       </div>
 
-      {/* Banners Table */}
-      {/* <div className="bg-white shadow rounded-lg overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-          <h2 className="text-xl font-semibold text-gray-900">Admin Banners</h2>
-          <button
-            onClick={() => navigate("/admin/banners")}
-            className="text-sm text-gray-600 hover:text-black font-medium"
-          >
-            View All →
-          </button>
+      <div className="text-4xl font-bold text-gray-900 mb-1">
+        {data.total.toLocaleString()}
+      </div>
+
+      <div className="grid grid-cols-2 gap-2 text-sm mt-3">
+        <div>
+          <span className="text-gray-500">Active</span>
+          <p className="font-medium text-emerald-700">{data.active.toLocaleString()}</p>
         </div>
-        
-        {loadingBanners ? (
-          <div className="p-8 text-center text-gray-500">Loading banners...</div>
-        ) : banners.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">
-            No banners found. <button onClick={() => navigate("/admin/banners/create")} className="text-black hover:underline font-medium">Create one →</button>
+        <div>
+          <span className="text-gray-500">Inactive</span>
+          <p className="font-medium text-rose-700">{data.inactive.toLocaleString()}</p>
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="min-h-screen bg-gray-50/50 px-6 py-8">
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <div className="mb-10">
+          <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
+          <p className="mt-1.5 text-gray-600">Overview of your store's key metrics</p>
+        </div>
+
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+          {Object.entries(counts).map(([key, value]) => (
+            <StatCard key={key} title={key} data={value} />
+          ))}
+        </div>
+
+        {/* Uncomment and improve banners section later if needed */}
+        {/* <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+          <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between">
+            <h2 className="text-xl font-semibold text-gray-900">Featured Banners</h2>
+            <button
+              onClick={() => navigate("/admin/banners")}
+              className="text-sm text-gray-600 hover:text-gray-900 font-medium transition-colors"
+            >
+              View All →
+            </button>
           </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-50 border-b border-gray-200">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Image</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Heading</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Subheading</th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Page</th>
-                  <th className="px-6 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {banners.slice(0, 5).map((banner) => {
-                  const isVideo = /\.(mp4|webm|ogg|mov|avi|mkv)(\?.*)?$/i.test(banner.url) || 
-                                 banner.url.includes('video') ||
-                                 banner.key?.includes('video');
-                  
-                  return (
-                    <tr key={banner._id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4">
-                        <div 
-                          className="relative w-20 h-20 rounded-lg overflow-hidden cursor-pointer group"
-                          onClick={() => setZoomedImage(banner)}
-                        >
-                          {isVideo ? (
-                            <video
-                              src={banner.url}
-                              className="w-full h-full object-cover"
-                              muted
-                              loop
-                              playsInline
-                            />
-                          ) : (
-                            <img
-                              src={banner.url}
-                              alt={banner.heading || "banner"}
-                              className="w-full h-full object-cover"
-                            />
-                          )}
-                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all flex items-center justify-center">
-                            <ZoomIn className="text-white opacity-0 group-hover:opacity-100 transition-opacity" size={20} />
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm font-medium text-gray-900 max-w-xs truncate">
-                          {banner.heading || "—"}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="text-sm text-gray-600 max-w-xs truncate">
-                          {banner.subHeading || "—"}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className="inline-flex px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-700">
-                          {banner.page || "—"}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <button
-                          onClick={() => navigate(`/admin/banners/edit/${banner._id}`)}
-                          className="text-blue-600 hover:text-blue-700 font-medium text-sm"
-                        >
-                          Edit
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          {/* ... banner table content ... */}
+        {/* </div> */}
+
+        {/* Zoom Modal */}
+        {zoomedImage && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm p-4"
+            onClick={() => setZoomedImage(null)}
+          >
+            <div className="relative max-w-[95vw] max-h-[90vh] rounded-xl overflow-hidden">
+              <button
+                onClick={() => setZoomedImage(null)}
+                className="absolute top-4 right-4 z-10 text-white/90 hover:text-white bg-black/40 hover:bg-black/60 rounded-full p-2 transition-all"
+              >
+                <FiX size={24} />
+              </button>
+
+              {/\.(mp4|webm|ogg|mov|avi|mkv)(\?.*)?$/i.test(zoomedImage.url) ||
+              zoomedImage.url?.includes('video') ||
+              zoomedImage.key?.includes('video') ? (
+                <video
+                  src={zoomedImage.url}
+                  controls
+                  autoPlay
+                  className="max-w-full max-h-[90vh] object-contain rounded-xl"
+                  onClick={(e) => e.stopPropagation()}
+                />
+              ) : (
+                <img
+                  src={zoomedImage.url}
+                  alt={zoomedImage.heading || "banner"}
+                  className="max-w-full max-h-[90vh] object-contain rounded-xl"
+                  onClick={(e) => e.stopPropagation()}
+                />
+              )}
+
+              {(zoomedImage.heading || zoomedImage.subHeading) && (
+                <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-6 text-white">
+                  {zoomedImage.heading && (
+                    <p className="font-semibold text-lg">{zoomedImage.heading}</p>
+                  )}
+                  {zoomedImage.subHeading && (
+                    <p className="text-sm text-gray-200 mt-1">{zoomedImage.subHeading}</p>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         )}
-      </div> */}
-
-      {/* Image Zoom Modal */}
-      {zoomedImage && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4"
-          onClick={() => setZoomedImage(null)}
-        >
-          <div className="relative max-w-[95vw] max-h-[90vh]">
-            <button
-              onClick={() => setZoomedImage(null)}
-              className="absolute -top-10 right-0 text-white hover:text-gray-300 transition-colors"
-            >
-              <X size={24} />
-            </button>
-            {/\.(mp4|webm|ogg|mov|avi|mkv)(\?.*)?$/i.test(zoomedImage.url) || 
-             zoomedImage.url.includes('video') ||
-             zoomedImage.key?.includes('video') ? (
-              <video
-                src={zoomedImage.url}
-                controls
-                className="max-w-full max-h-[90vh] w-auto h-auto"
-                onClick={(e) => e.stopPropagation()}
-              />
-            ) : (
-              <img
-                src={zoomedImage.url}
-                alt={zoomedImage.heading || "zoomed image"}
-                className="max-w-full max-h-[90vh] w-auto h-auto"
-                onClick={(e) => e.stopPropagation()}
-              />
-            )}
-            {(zoomedImage.heading || zoomedImage.subHeading) && (
-              <div className="mt-4 text-white text-center">
-                {zoomedImage.heading && <p className="font-semibold">{zoomedImage.heading}</p>}
-                {zoomedImage.subHeading && <p className="text-sm text-gray-300">{zoomedImage.subHeading}</p>}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      </div>
     </div>
   );
 }
