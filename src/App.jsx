@@ -11,7 +11,7 @@ function App() {
       <Route path="/admin/*" element={<AdminRoutes />} />
       
       {/* Influencer Routes */}
-       <Route path="/influencer/*" element={<InfluencerRoutes />} /> *
+      <Route path="/influencer/*" element={<InfluencerRoutes />} />
       
       {/* Driver Routes */}
        <Route path="/driver/*" element={<DriverRoutes />} /> 
