@@ -21,6 +21,7 @@ export const driverEndpoints = {
   REJECT: (id) => `${BASE}/deliveries/${id}/reject`,
   PICKUP: (id) => `${BASE}/deliveries/${id}/pickup`,
   OUT_FOR_DELIVERY: (id) => `${BASE}/deliveries/${id}/out-for-delivery`,
+  EXCHANGE_RECEIVED: (id) => `${BASE}/deliveries/${id}/exchange-received`,
   COD_PAYMENT_QR: (id) => `${BASE}/deliveries/${id}/cod-payment-qr`,
   DELIVERED: (id) => `${BASE}/deliveries/${id}/delivered`,
 };
@@ -76,6 +77,10 @@ export const markPickup = (assignmentId) =>
 /** POST – mark out for delivery. */
 export const markOutForDelivery = (assignmentId) =>
   apiConnector("POST", driverEndpoints.OUT_FOR_DELIVERY(assignmentId));
+
+/** POST – mark exchange received (exchange pickup only: item handed over at warehouse). */
+export const markExchangeReceived = (assignmentId) =>
+  apiConnector("POST", driverEndpoints.EXCHANGE_RECEIVED(assignmentId));
 
 /** POST – get COD payment QR (body not needed). Returns { qrCodeId, imageUrl, amount }. */
 export const getCodPaymentQr = (assignmentId) =>

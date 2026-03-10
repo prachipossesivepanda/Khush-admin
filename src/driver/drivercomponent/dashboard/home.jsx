@@ -3,6 +3,24 @@ import { MapPin, Clock } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { getMyDeliveries } from "../../apis/driverApi";
 
+/** Item statuses that indicate this assignment is for exchange (pickup/delivery), not regular order delivery */
+const EXCHANGE_ITEM_STATUSES = [
+  "EXCHANGE_PICKUP_SCHEDULED",
+  "EXCHANGE_PICKED",
+  "EXCHANGE_RECEIVED",
+  "EXCHANGE_PROCESSING",
+  "EXCHANGE_SHIPPED",
+  "EXCHANGE_DELIVERED",
+  "EXCHANGE_COMPLETED",
+];
+
+function isExchangeAssignment(assignment) {
+  const items = assignment?.items ?? [];
+  return items.some(
+    (it) => it?.status && EXCHANGE_ITEM_STATUSES.includes(String(it.status).toUpperCase())
+  );
+}
+
 function buildDeliveryAddress(address) {
   if (!address) return "";
   const parts = [
@@ -32,9 +50,15 @@ export default function DriverDashboard() {
     setLoading(true);
     try {
       const res = await getMyDeliveries();
+      console.log("[DriverDashboard home] getMyDeliveries full response:", res);
+      console.log("[DriverDashboard home] res?.data:", res?.data);
       const list = res?.data ?? res ?? [];
-      setDeliveries(Array.isArray(list) ? list : []);
-    } catch {
+      const arr = Array.isArray(list) ? list : [];
+      const regularOnly = arr.filter((a) => !isExchangeAssignment(a));
+      console.log("[DriverDashboard home] deliveries list (all):", arr, "regular only:", regularOnly);
+      setDeliveries(regularOnly);
+    } catch (err) {
+      console.log("[DriverDashboard home] getMyDeliveries error:", err?.response ?? err);
       setDeliveries([]);
     } finally {
       setLoading(false);

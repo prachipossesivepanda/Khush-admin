@@ -9,12 +9,82 @@ import {
   rejectDelivery,
   markPickup,
   markOutForDelivery,
+  markExchangeReceived,
   getCodPaymentQr,
   markDelivered,
 } from "../../apis/driverApi";
 
+// Full exchange flow (matches timeline: Requested → Approved → … → Completed).
+// Driver assignments exist for EXCHANGE_PICKUP_SCHEDULED (pickup) and EXCHANGE_SHIPPED (delivery).
+const EXCHANGE_FLOW_STATUSES = [
+  "EXCHANGE_REQUESTED",
+  "EXCHANGE_APPROVED",
+  "EXCHANGE_PICKUP_SCHEDULED",
+  "EXCHANGE_PICKED",
+  "EXCHANGE_RECEIVED",
+  "EXCHANGE_PROCESSING",
+  "EXCHANGE_SHIPPED",
+  "EXCHANGE_DELIVERED",
+  "EXCHANGE_COMPLETED",
+];
+
+const EXCHANGE_FLOW_LABELS = {
+  EXCHANGE_REQUESTED: "Exchange Requested",
+  EXCHANGE_APPROVED: "Exchange Approved",
+  EXCHANGE_PICKUP_SCHEDULED: "Exchange Pickup Scheduled",
+  EXCHANGE_PICKED: "Exchange Picked",
+  EXCHANGE_RECEIVED: "Exchange Received",
+  EXCHANGE_PROCESSING: "Exchange Processing",
+  EXCHANGE_SHIPPED: "Exchange Shipped",
+  EXCHANGE_DELIVERED: "Exchange Delivered",
+  EXCHANGE_COMPLETED: "Exchange Completed",
+};
+
+// The 4 exchange statuses the driver can update (in order).
+const DRIVER_EXCHANGE_STATUSES = [
+  "EXCHANGE_PICKED",
+  "EXCHANGE_RECEIVED",
+  "EXCHANGE_SHIPPED",
+  "EXCHANGE_DELIVERED",
+];
+const DRIVER_EXCHANGE_LABELS = {
+  EXCHANGE_PICKED: "Exchange Picked",
+  EXCHANGE_RECEIVED: "Exchange Received",
+  EXCHANGE_SHIPPED: "Exchange Shipped",
+  EXCHANGE_DELIVERED: "Exchange Delivered",
+};
+
+// Item statuses that indicate a driver assignment is for an exchange (subset of EXCHANGE_FLOW_STATUSES).
+const EXCHANGE_ITEM_STATUSES = EXCHANGE_FLOW_STATUSES.filter(
+  (s) => !["EXCHANGE_REQUESTED", "EXCHANGE_APPROVED"].includes(s)
+);
+
+function isExchangeAssignment(assignment) {
+  const items = assignment?.items ?? [];
+  return items.some(
+    (it) => it?.status && EXCHANGE_ITEM_STATUSES.includes(String(it.status).toUpperCase())
+  );
+}
+
+/** True if this exchange is for pickup (collect item from customer); false if for delivery (deliver replacement) */
+function isExchangePickup(assignment) {
+  const items = assignment?.items ?? [];
+  const pickupStatuses = ["EXCHANGE_PICKUP_SCHEDULED", "EXCHANGE_PICKED", "EXCHANGE_RECEIVED", "EXCHANGE_PROCESSING"];
+  return items.some(
+    (it) => it?.status && pickupStatuses.includes(String(it.status).toUpperCase())
+  );
+}
+
 const STATUS_LABELS = {
   ASSIGNED: "New assignment",
+  ACCEPTED: "Accepted",
+  PICKED_UP: "Picked up",
+  OUT_FOR_DELIVERY: "Out for delivery",
+  DELIVERED: "Delivered",
+};
+
+const EXCHANGE_STATUS_LABELS = {
+  ASSIGNED: "New exchange assignment",
   ACCEPTED: "Accepted",
   PICKED_UP: "Picked up",
   OUT_FOR_DELIVERY: "Out for delivery",
@@ -136,6 +206,10 @@ export default function AssignmentDetails() {
   const amountToCollect = assignment?.amountToCollect ?? 0;
   const paymentMode = assignment?.paymentMode ?? "COD";
 
+  const isExchange = isExchangeAssignment(assignment);
+  const isPickup = isExchange && isExchangePickup(assignment);
+  const statusLabel = isExchange ? (EXCHANGE_STATUS_LABELS[status] || STATUS_LABELS[status] || status) : (STATUS_LABELS[status] || status);
+
   // Build a single-line address for display and for Google Maps (Get direction)
   const deliveryAddressParts = [
     address?.fullAddress || address?.addressLine,
@@ -154,8 +228,8 @@ export default function AssignmentDetails() {
       <div className="w-full max-w-[375px] bg-white flex flex-col">
         <div className="relative h-[64px] px-6 flex items-center border-b border-gray-300 bg-gray-100">
           <MdArrowBackIos size={22} className="cursor-pointer" onClick={() => navigate(-1)} />
-          <h1 className="absolute left-1/2 -translate-x-1/2 text-[15px] font-bold tracking-[2.5px] uppercase">
-            ASSIGNMENT
+          <h1 className="absolute left-1/2 -translate-x-1/2 text-[15px] font-bold tracking-[2.5px] uppercase text-center">
+            {isExchange ? (isPickup ? "Exchange pickup" : "Exchange delivery") : "Assignment"}
           </h1>
           {/* <button
             onClick={() => navigate("/driver/dashboard")}
@@ -167,17 +241,52 @@ export default function AssignmentDetails() {
 
         <div className="flex-1 overflow-y-auto px-6 py-6 space-y-4">
           <div className="flex flex-wrap items-center gap-2">
-            <p className="text-sm font-medium text-gray-600">{STATUS_LABELS[status] || status}</p>
-            <span
-              className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
-                paymentMode === "COD"
-                  ? "bg-amber-100 text-amber-800"
-                  : "bg-green-100 text-green-800"
-              }`}
-            >
-              {paymentMode === "COD" ? "COD" : "Prepaid"}
-            </span>
+            <p className="text-sm font-medium text-gray-600">{statusLabel}</p>
+            {isExchange ? (
+              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-violet-100 text-violet-800">
+                Exchange
+              </span>
+            ) : (
+              <span
+                className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${
+                  paymentMode === "COD"
+                    ? "bg-amber-100 text-amber-800"
+                    : "bg-green-100 text-green-800"
+                }`}
+              >
+                {paymentMode === "COD" ? "COD" : "Prepaid"}
+              </span>
+            )}
           </div>
+
+          {isExchange && (
+            <div className="space-y-2">
+              <p className="text-[12px] font-semibold text-gray-700 uppercase tracking-wide">Exchange status (driver updates)</p>
+              <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px]">
+                {DRIVER_EXCHANGE_STATUSES.map((driverStatus) => {
+                  const itemStatuses = [...new Set(items.map((it) => (it?.status || "").toUpperCase()).filter(Boolean))];
+                  const statusesConsideredDone = {
+                    EXCHANGE_PICKED: ["EXCHANGE_PICKED", "EXCHANGE_RECEIVED", "EXCHANGE_SHIPPED", "OUT_FOR_DELIVERY", "EXCHANGE_DELIVERED"],
+                    EXCHANGE_RECEIVED: ["EXCHANGE_RECEIVED", "EXCHANGE_SHIPPED", "OUT_FOR_DELIVERY", "EXCHANGE_DELIVERED"],
+                    EXCHANGE_SHIPPED: ["EXCHANGE_SHIPPED", "OUT_FOR_DELIVERY", "EXCHANGE_DELIVERED"],
+                    EXCHANGE_DELIVERED: ["EXCHANGE_DELIVERED"],
+                  };
+                  const done = itemStatuses.some((st) => (statusesConsideredDone[driverStatus] || []).includes(st));
+                  const current = itemStatuses.some((st) => st === driverStatus) ||
+                    (driverStatus === "EXCHANGE_SHIPPED" && itemStatuses.includes("OUT_FOR_DELIVERY"));
+                  return (
+                    <span
+                      key={driverStatus}
+                      className={done ? "text-violet-700 font-medium" : current ? "text-violet-600 font-semibold" : "text-gray-400"}
+                    >
+                      {DRIVER_EXCHANGE_LABELS[driverStatus]}
+                      {done && " ✓"}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {items.map((item, idx) => {
             const imageUrl = item?.variant?.imageUrl || "https://picsum.photos/100/87";
@@ -211,7 +320,7 @@ export default function AssignmentDetails() {
           <div className="space-y-3">
             <div className="flex items-center gap-2 text-[12px] font-semibold">
               <MapPin size={14} />
-              DELIVER TO
+              {isExchange ? (isPickup ? "PICKUP FROM" : "DELIVER TO") : "DELIVER TO"}
             </div>
             <div className="text-[12px] text-gray-700 space-y-1">
               <p className="font-semibold">{address?.name || "—"}</p>
@@ -225,7 +334,7 @@ export default function AssignmentDetails() {
             {import.meta.env.VITE_GOOGLE_MAPS_EMBED_KEY && deliveryAddressString && (
               <div className="w-full aspect-video rounded-xl overflow-hidden border border-gray-200 mt-2">
                 <iframe
-                  title="Delivery location"
+                  title={isExchange && isPickup ? "Pickup location" : "Delivery location"}
                   width="100%"
                   height="100%"
                   style={{ border: 0 }}
@@ -241,7 +350,7 @@ export default function AssignmentDetails() {
               rel="noopener noreferrer"
               className="w-full h-[48px] bg-black text-white rounded-xl flex items-center justify-center gap-2 text-[12px] font-semibold mt-4"
             >
-              GET DIRECTION
+              {isExchange && isPickup ? "GET DIRECTION (Pickup)" : "GET DIRECTION"}
               <Send size={14} />
             </a>
           </div>
@@ -249,8 +358,17 @@ export default function AssignmentDetails() {
           <div className="border-b border-gray-300" />
 
           <div className="flex justify-between text-[16px] font-medium">
-            <span>{paymentMode === "COD" ? "Cash to collect" : "Prepaid"}</span>
-            <span>₹{amountToCollect.toFixed(2)}</span>
+            {isExchange ? (
+              <>
+                <span>Exchange {isPickup ? "pickup" : "delivery"}</span>
+                <span>{amountToCollect > 0 ? `₹${amountToCollect.toFixed(2)}` : "No payment"}</span>
+              </>
+            ) : (
+              <>
+                <span>{paymentMode === "COD" ? "Cash to collect" : "Prepaid"}</span>
+                <span>₹{amountToCollect.toFixed(2)}</span>
+              </>
+            )}
           </div>
         </div>
 
@@ -264,14 +382,14 @@ export default function AssignmentDetails() {
                 disabled={actionLoading}
                 className="w-full h-[52px] bg-black text-white rounded-xl text-[14px] font-semibold disabled:opacity-70"
               >
-                {actionLoading ? "…" : "Accept"}
+                {actionLoading ? "…" : isExchange ? "Accept exchange" : "Accept"}
               </button>
               <button
                 onClick={() => runAction(rejectDelivery)}
                 disabled={actionLoading}
                 className="w-full h-[52px] border border-gray-400 rounded-xl text-[14px] font-semibold disabled:opacity-70"
               >
-                Reject
+                {isExchange ? "Reject exchange" : "Reject"}
               </button>
             </>
           )}
@@ -281,16 +399,31 @@ export default function AssignmentDetails() {
               disabled={actionLoading}
               className="w-full h-[52px] bg-black text-white rounded-xl text-[14px] font-semibold disabled:opacity-70"
             >
-              {actionLoading ? "…" : "Mark Pickup"}
+              {actionLoading
+                ? "…"
+                : isExchange && isPickup
+                  ? "Exchange Picked"
+                  : isExchange
+                    ? "Mark pickup"
+                    : "Mark Pickup"}
             </button>
           )}
-          {status === "PICKED_UP" && (
+          {status === "PICKED_UP" && isExchange && isPickup && (
+            <button
+              onClick={() => runAction(markExchangeReceived)}
+              disabled={actionLoading}
+              className="w-full h-[52px] bg-black text-white rounded-xl text-[14px] font-semibold disabled:opacity-70"
+            >
+              {actionLoading ? "…" : "Exchange Received"}
+            </button>
+          )}
+          {status === "PICKED_UP" && (!isExchange || !isPickup) && (
             <button
               onClick={() => runAction(markOutForDelivery)}
               disabled={actionLoading}
               className="w-full h-[52px] bg-black text-white rounded-xl text-[14px] font-semibold disabled:opacity-70"
             >
-              {actionLoading ? "…" : "Out for Delivery"}
+              {actionLoading ? "…" : isExchange ? "Exchange Shipped" : "Out for Delivery"}
             </button>
           )}
           {status === "OUT_FOR_DELIVERY" && paymentMode !== "COD" && (
@@ -299,7 +432,7 @@ export default function AssignmentDetails() {
               disabled={actionLoading}
               className="w-full h-[52px] bg-black text-white rounded-xl text-[14px] font-semibold disabled:opacity-70"
             >
-              {actionLoading ? "…" : "Mark Delivered"}
+              {actionLoading ? "…" : isExchange ? "Exchange Delivered" : "Mark Delivered"}
             </button>
           )}
           {status === "OUT_FOR_DELIVERY" && paymentMode === "COD" && (
@@ -337,7 +470,7 @@ export default function AssignmentDetails() {
                   disabled={actionLoading}
                   className="w-full h-[52px] bg-black text-white rounded-xl text-[14px] font-semibold disabled:opacity-70"
                 >
-                  {actionLoading ? "…" : "Mark Delivered (Cash)"}
+                  {actionLoading ? "…" : isExchange ? "Exchange Delivered (Cash)" : "Mark Delivered (Cash)"}
                 </button>
               )}
               {codPaymentChoice === "ONLINE" && !showQr && (
@@ -396,7 +529,7 @@ export default function AssignmentDetails() {
                         disabled={actionLoading}
                         className="w-full h-[52px] bg-black text-white rounded-xl text-[14px] font-semibold disabled:opacity-70"
                       >
-                        {actionLoading ? "…" : "Mark Delivered"}
+                        {actionLoading ? "…" : isExchange ? "Exchange Delivered" : "Mark Delivered"}
                       </button>
                     </>
                   ) : (
@@ -407,7 +540,9 @@ export default function AssignmentDetails() {
             </>
           )}
           {(status === "DELIVERED" || status === "REJECTED" || status === "CANCELLED") && (
-            <p className="text-center text-gray-500 text-sm">No actions available.</p>
+            <p className="text-center text-gray-500 text-sm">
+              {isExchange && status === "DELIVERED" ? "Exchange complete. No actions available." : "No actions available."}
+            </p>
           )}
         </div>
       </div>

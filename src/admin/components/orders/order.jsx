@@ -64,6 +64,14 @@ const Orders = () => {
   const [selectedDeliveryAgentId, setSelectedDeliveryAgentId] = useState("");
   const [assignLoading, setAssignLoading] = useState(false);
   const [assignError, setAssignError] = useState(null);
+  // Exchange rejection: require note before updating to EXCHANGE_REJECTED
+  const [rejectionModalOpen, setRejectionModalOpen] = useState(false);
+  const [pendingRejection, setPendingRejection] = useState(null); // { orderId, itemId }
+  const [rejectionNote, setRejectionNote] = useState("");
+  const [rejectionSubmitting, setRejectionSubmitting] = useState(false);
+  const [rejectionError, setRejectionError] = useState(null);
+  // When true, assignment modal only assigns driver (no status update) - used after exchange status change
+  const [assignmentAssignOnly, setAssignmentAssignOnly] = useState(false);
 
   const fetchOrders = useCallback(async () => {
     try {
@@ -109,7 +117,10 @@ const Orders = () => {
     }
   };
 
+  // Statuses that require a driver to be assigned before changing to this status
   const STATUS_REQUIRES_ASSIGNMENT = ["SHIPPED", "OUT_FOR_DELIVERY"];
+  // After updating to these statuses, we open assignment modal so admin can assign a driver
+  const EXCHANGE_STATUSES_REQUIRE_DRIVER = ["EXCHANGE_PICKUP_SCHEDULED", "EXCHANGE_SHIPPED"];
   const WHOLE_ORDER_SENTINEL = "WHOLE_ORDER";
 
   const isItemAssigned = (assignments, itemId) => {
@@ -122,9 +133,10 @@ const Orders = () => {
     );
   };
 
-  const openAssignmentModal = (orderId, itemIdsOrWhole, newStatus) => {
+  const openAssignmentModal = (orderId, itemIdsOrWhole, newStatus, assignOnly = false) => {
     setAssignmentOrderId(orderId);
     setPendingNewStatus(newStatus);
+    setAssignmentAssignOnly(assignOnly);
     setSelectedDeliveryAgentId("");
     setAssignError(null);
     if (itemIdsOrWhole === WHOLE_ORDER_SENTINEL) {
@@ -151,8 +163,12 @@ const Orders = () => {
   };
 
   const handleAssignmentSubmit = async () => {
-    if (!assignmentOrderId || !pendingNewStatus || !selectedDeliveryAgentId) {
+    if (!assignmentOrderId || !selectedDeliveryAgentId) {
       setAssignError("Please select a delivery agent.");
+      return;
+    }
+    if (!assignmentAssignOnly && !pendingNewStatus) {
+      setAssignError("Status is required.");
       return;
     }
     if (assignmentMode === "items" && assignmentItemIds.length === 0) {
@@ -164,14 +180,19 @@ const Orders = () => {
     try {
       if (assignmentMode === "whole") {
         await assignWholeOrder(assignmentOrderId, selectedDeliveryAgentId);
-        await updateWholeOrderStatus(assignmentOrderId, { status: pendingNewStatus });
+        if (!assignmentAssignOnly) {
+          await updateWholeOrderStatus(assignmentOrderId, { status: pendingNewStatus });
+        }
       } else {
         await assignItems(assignmentOrderId, selectedDeliveryAgentId, assignmentItemIds);
-        for (const itemId of assignmentItemIds) {
-          await updateOrderItemStatus(assignmentOrderId, itemId, { status: pendingNewStatus });
+        if (!assignmentAssignOnly) {
+          for (const itemId of assignmentItemIds) {
+            await updateOrderItemStatus(assignmentOrderId, itemId, { status: pendingNewStatus });
+          }
         }
       }
       setAssignmentModalOpen(false);
+      setAssignmentAssignOnly(false);
       setWholeOrderNewStatus("");
       setSelectedItemIds([]);
       setBulkStatus("");
@@ -243,6 +264,15 @@ const Orders = () => {
   const handleUpdateSelectedItemsStatus = async () => {
     if (!selectedOrder?.orderId || selectedItemIds.length === 0 || !bulkStatus) return;
     const label = statusOptions.find((o) => o.value === bulkStatus)?.label || bulkStatus;
+
+    if (bulkStatus === "EXCHANGE_REJECTED") {
+      setPendingRejection({ orderId: selectedOrder.orderId, itemIds: [...selectedItemIds] });
+      setRejectionNote("");
+      setRejectionError(null);
+      setRejectionModalOpen(true);
+      return;
+    }
+
     const requiresAssignment = STATUS_REQUIRES_ASSIGNMENT.includes(bulkStatus);
     if (requiresAssignment) {
       try {
@@ -267,6 +297,11 @@ const Orders = () => {
       for (const itemId of selectedItemIds) {
         await updateOrderItemStatus(selectedOrder.orderId, itemId, { status: bulkStatus });
       }
+      if (EXCHANGE_STATUSES_REQUIRE_DRIVER.includes(bulkStatus)) {
+        if (window.confirm(`Assign a driver for these ${selectedItemIds.length} item(s)?`)) {
+          openAssignmentModal(selectedOrder.orderId, [...selectedItemIds], bulkStatus, true);
+        }
+      }
       setSelectedItemIds([]);
       setBulkStatus("");
       await fetchSingleOrder(selectedOrder.orderId);
@@ -281,6 +316,16 @@ const Orders = () => {
   const handleUpdateItemStatus = async (orderId, itemId, newStatus) => {
     if (!orderId || !itemId || !newStatus) return;
     const stringItemId = String(itemId);
+
+    // Exchange rejected: open modal to collect rejection note (required by backend)
+    if (newStatus === "EXCHANGE_REJECTED") {
+      setPendingRejection({ orderId, itemId: stringItemId });
+      setRejectionNote("");
+      setRejectionError(null);
+      setRejectionModalOpen(true);
+      return;
+    }
+
     const requiresAssignment = STATUS_REQUIRES_ASSIGNMENT.includes(newStatus);
     if (requiresAssignment) {
       try {
@@ -323,6 +368,13 @@ const Orders = () => {
     try {
       const payload = { status: newStatus };
       await updateOrderItemStatus(orderId, itemId, payload);
+      // After setting exchange pickup/delivery status, open assignment modal to assign driver
+      if (EXCHANGE_STATUSES_REQUIRE_DRIVER.includes(newStatus)) {
+        const label = statusOptions.find((o) => o.value === newStatus)?.label || newStatus;
+        if (window.confirm(`Assign a driver for this item (${label})?`)) {
+          openAssignmentModal(orderId, itemId, newStatus, true);
+        }
+      }
     } catch (err) {
       console.error("Status update failed:", err);
       const msg = typeof err === "string" ? err : err?.response?.data?.message || "Failed to update item status.";
@@ -342,6 +394,44 @@ const Orders = () => {
       }
     } finally {
       setUpdatingItemId(null);
+    }
+  };
+
+  const handleRejectionSubmit = async () => {
+    if (!pendingRejection?.orderId) return;
+    const note = (rejectionNote || "").trim();
+    if (!note) {
+      setRejectionError("Rejection note is required.");
+      return;
+    }
+    setRejectionSubmitting(true);
+    setRejectionError(null);
+    try {
+      const orderId = pendingRejection.orderId;
+      if (pendingRejection.itemIds && pendingRejection.itemIds.length > 0) {
+        for (const itemId of pendingRejection.itemIds) {
+          await updateOrderItemStatus(orderId, itemId, {
+            status: "EXCHANGE_REJECTED",
+            notes: note,
+          });
+        }
+      } else if (pendingRejection.itemId) {
+        await updateOrderItemStatus(orderId, pendingRejection.itemId, {
+          status: "EXCHANGE_REJECTED",
+          notes: note,
+        });
+      }
+      setRejectionModalOpen(false);
+      setPendingRejection(null);
+      setRejectionNote("");
+      setSelectedItemIds([]);
+      setBulkStatus("");
+      fetchSingleOrder(orderId);
+    } catch (err) {
+      const msg = err?.response?.data?.message || err?.message || "Failed to reject exchange.";
+      setRejectionError(msg);
+    } finally {
+      setRejectionSubmitting(false);
     }
   };
 
@@ -893,13 +983,19 @@ const Orders = () => {
         {assignmentModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
             <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-2">Assign delivery driver</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                {assignmentAssignOnly ? "Assign driver for exchange" : "Assign delivery driver"}
+              </h3>
               <p className="text-sm text-gray-600 mb-4">
-                {assignmentMode === "whole"
-                  ? `Assign a driver to this order before marking as ${statusOptions.find((o) => o.value === pendingNewStatus)?.label || pendingNewStatus}.`
-                  : assignmentItemIds.length === 1
-                    ? `Assign a driver to this item before marking as ${statusOptions.find((o) => o.value === pendingNewStatus)?.label || pendingNewStatus}.`
-                    : `Assign a driver to these ${assignmentItemIds.length} items before marking as ${statusOptions.find((o) => o.value === pendingNewStatus)?.label || pendingNewStatus}.`}
+                {assignmentAssignOnly
+                  ? (assignmentItemIds.length === 1
+                      ? `Assign a driver to this item (${statusOptions.find((o) => o.value === pendingNewStatus)?.label || pendingNewStatus}).`
+                      : `Assign a driver to these ${assignmentItemIds.length} items (${statusOptions.find((o) => o.value === pendingNewStatus)?.label || pendingNewStatus}).`)
+                  : assignmentMode === "whole"
+                    ? `Assign a driver to this order before marking as ${statusOptions.find((o) => o.value === pendingNewStatus)?.label || pendingNewStatus}.`
+                    : assignmentItemIds.length === 1
+                      ? `Assign a driver to this item before marking as ${statusOptions.find((o) => o.value === pendingNewStatus)?.label || pendingNewStatus}.`
+                      : `Assign a driver to these ${assignmentItemIds.length} items before marking as ${statusOptions.find((o) => o.value === pendingNewStatus)?.label || pendingNewStatus}.`}
               </p>
               <div className="mb-4">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Delivery agent</label>
@@ -940,8 +1036,68 @@ const Orders = () => {
                       <RefreshCw size={14} className="animate-spin" />
                       Assigning…
                     </>
+                  ) : assignmentAssignOnly ? (
+                    "Assign driver"
                   ) : (
                     "Assign & update status"
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Exchange rejection note modal */}
+        {rejectionModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-2">Reject exchange request</h3>
+              <p className="text-sm text-gray-600 mb-4">
+                {pendingRejection?.itemIds?.length
+                  ? `A rejection note is required for ${pendingRejection.itemIds.length} selected item(s). It will be shown to the customer.`
+                  : "A rejection note is required. It will be shown to the customer."}
+              </p>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Rejection note *</label>
+                <textarea
+                  value={rejectionNote}
+                  onChange={(e) => setRejectionNote(e.target.value)}
+                  placeholder="e.g. Item does not meet exchange policy criteria."
+                  rows={4}
+                  className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-indigo-500 focus:ring-indigo-500"
+                />
+              </div>
+              {rejectionError && (
+                <p className="text-sm text-red-600 mb-3">{rejectionError}</p>
+              )}
+              <div className="flex gap-3 justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!rejectionSubmitting) {
+                      setRejectionModalOpen(false);
+                      setPendingRejection(null);
+                      setRejectionNote("");
+                      setRejectionError(null);
+                    }
+                  }}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleRejectionSubmit}
+                  disabled={rejectionSubmitting || !rejectionNote.trim()}
+                  className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 flex items-center gap-2"
+                >
+                  {rejectionSubmitting ? (
+                    <>
+                      <RefreshCw size={14} className="animate-spin" />
+                      Rejecting…
+                    </>
+                  ) : (
+                    "Reject exchange"
                   )}
                 </button>
               </div>
