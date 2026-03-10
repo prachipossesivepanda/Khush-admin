@@ -17,6 +17,17 @@ const orderEndpoints = {
     return url;
   },
 
+  // Get All Order Items (item-based list for admin)
+  GET_ORDER_ITEMS: (page = 1, limit = 20, search = "", orderStatus = "", itemStatus = "", startDate = "", endDate = "") => {
+    let url = `/admin/orders/items?page=${page}&limit=${limit}`;
+    if (search) url += `&search=${encodeURIComponent(search)}`;
+    if (orderStatus) url += `&orderStatus=${encodeURIComponent(orderStatus)}`;
+    if (itemStatus) url += `&itemStatus=${encodeURIComponent(itemStatus)}`;
+    if (startDate) url += `&startDate=${encodeURIComponent(startDate)}`;
+    if (endDate) url += `&endDate=${encodeURIComponent(endDate)}`;
+    return url;
+  },
+
   // Get Single Order (with item pagination)
   GET_SINGLE_ORDER: (orderId, itemPage = 1, itemLimit = 10) =>
     `/admin/orders/${orderId}?itemPage=${itemPage}&itemLimit=${itemLimit}`,
@@ -44,6 +55,14 @@ export const getOrders = (page, limit, search, status) => {
   return apiConnector(
     "GET",
     orderEndpoints.GET_ORDERS(page, limit, search, status)
+  );
+};
+
+// ✅ Get All Order Items (item-based list)
+export const getOrderItems = (page, limit, search, orderStatus, itemStatus, startDate, endDate) => {
+  return apiConnector(
+    "GET",
+    orderEndpoints.GET_ORDER_ITEMS(page, limit, search, orderStatus, itemStatus, startDate, endDate)
   );
 };
 

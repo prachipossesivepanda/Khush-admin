@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import {
   getOrders,
+  getOrderItems,
   getSingleOrder,
   updateOrderItemStatus,
   updateWholeOrderStatus,
@@ -27,9 +28,14 @@ import {
   MapPin,
   DollarSign,
   ShoppingBag,
+  UserCircle,
 } from "lucide-react";
 
+const VIEW_ORDER = "order";
+const VIEW_ITEM = "item";
+
 const Orders = () => {
+  const [viewMode, setViewMode] = useState(VIEW_ORDER); // "order" | "item"
   const [orders, setOrders] = useState([]);
   const [pagination, setPagination] = useState({
     page: 1,
@@ -41,6 +47,13 @@ const Orders = () => {
   const [statusFilter, setStatusFilter] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  // Item-based view state
+  const [orderItems, setOrderItems] = useState([]);
+  const [itemPagination, setItemPagination] = useState({ page: 1, limit: 20, total: 0, totalPages: 1 });
+  const [itemSearch, setItemSearch] = useState("");
+  const [itemStatusFilter, setItemStatusFilter] = useState("");
+  const [itemLoading, setItemLoading] = useState(false);
+  const [itemError, setItemError] = useState(null);
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [orderLoading, setOrderLoading] = useState(false);
   const [orderError, setOrderError] = useState(null);
@@ -48,7 +61,8 @@ const Orders = () => {
   const [updatingWholeOrder, setUpdatingWholeOrder] = useState(false);
   const [wholeOrderNewStatus, setWholeOrderNewStatus] = useState("");
   const [itemPage, setItemPage] = useState(1);
-  const itemLimit = 8;
+  // Load all items when viewing order details (no per-order item pagination)
+  const itemLimit = 100;
   // Multi-select items for bulk status update
   const [selectedItemIds, setSelectedItemIds] = useState([]);
   const [bulkStatus, setBulkStatus] = useState("");
@@ -72,6 +86,8 @@ const Orders = () => {
   const [rejectionError, setRejectionError] = useState(null);
   // When true, assignment modal only assigns driver (no status update) - used after exchange status change
   const [assignmentAssignOnly, setAssignmentAssignOnly] = useState(false);
+  // When set, we opened from "By item" view: show only this item's details (item-based flow), not full order
+  const [selectedItemIdFromListView, setSelectedItemIdFromListView] = useState(null);
 
   const fetchOrders = useCallback(async () => {
     try {
@@ -102,12 +118,43 @@ const Orders = () => {
     fetchOrders();
   }, [fetchOrders]);
 
+  const fetchOrderItems = useCallback(async () => {
+    try {
+      setItemLoading(true);
+      setItemError(null);
+      const res = await getOrderItems(
+        itemPagination.page,
+        itemPagination.limit,
+        itemSearch,
+        "",
+        itemStatusFilter
+      );
+      const data = res?.data || {};
+      setOrderItems(data.items || []);
+      setItemPagination((prev) => ({
+        ...prev,
+        total: data.pagination?.total ?? 0,
+        totalPages: data.pagination?.totalPages ?? 1,
+      }));
+    } catch (err) {
+      console.error("Failed to fetch order items:", err);
+      setItemError(err?.response?.data?.message || "Failed to load order items.");
+    } finally {
+      setItemLoading(false);
+    }
+  }, [itemPagination.page, itemPagination.limit, itemSearch, itemStatusFilter]);
+
+  useEffect(() => {
+    if (viewMode === VIEW_ITEM) fetchOrderItems();
+  }, [viewMode, fetchOrderItems]);
+
   const fetchSingleOrder = async (orderId) => {
     if (!orderId) return;
     try {
       setOrderLoading(true);
       setOrderError(null);
-      const res = await getSingleOrder(orderId, itemPage, itemLimit);
+      // Fetch with page 1 and high limit so all items in the order are returned
+      const res = await getSingleOrder(orderId, 1, itemLimit);
       setSelectedOrder(res?.data || null);
     } catch (err) {
       console.error("Failed to load order:", err);
@@ -435,6 +482,15 @@ const Orders = () => {
     }
   };
 
+  const getDriverPartnerDisplay = (item) => {
+    const agent = item?.deliveryAgentId;
+    if (!agent) return null;
+    const name = typeof agent === "object" ? agent.name : null;
+    const phone = typeof agent === "object" ? agent.phoneNumber : null;
+    if (!name && !phone) return null;
+    return { name: name || "—", phone: phone || "" };
+  };
+
   const getStatusBadge = (status = "pending") => {
     let s = (status || "pending")
       .toUpperCase()
@@ -503,7 +559,7 @@ const Orders = () => {
     <div className="min-h-screen px-4 py-6 sm:px-6 lg:px-8 ">
       <div className="mx-auto max-w-7xl">
         {/* Header + Search */}
-        <div className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mb-6 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-2xl font-bold text-gray-900 sm:text-3xl flex items-center gap-3">
             <Package className="h-8 w-8 text-indigo-600" />
             Order Management
@@ -512,129 +568,294 @@ const Orders = () => {
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
             <input
               type="text"
-              placeholder="Search by ID, name, phone..."
-              value={search}
+              placeholder={viewMode === VIEW_ORDER ? "Search by ID, name, phone..." : "Search by order ID, SKU, customer..."}
+              value={viewMode === VIEW_ORDER ? search : itemSearch}
               onChange={(e) => {
-                setSearch(e.target.value);
-                setPagination((p) => ({ ...p, page: 1 }));
+                if (viewMode === VIEW_ORDER) {
+                  setSearch(e.target.value);
+                  setPagination((p) => ({ ...p, page: 1 }));
+                } else {
+                  setItemSearch(e.target.value);
+                  setItemPagination((p) => ({ ...p, page: 1 }));
+                }
               }}
               className="w-full rounded-lg border border-gray-300 pl-10 py-2 text-sm focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
             />
           </div>
         </div>
 
-        {error && (
+        {/* View mode tabs: By order | By item */}
+        <div className="mb-6 flex gap-2 border-b border-gray-200">
+          <button
+            type="button"
+            onClick={() => setViewMode(VIEW_ORDER)}
+            className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              viewMode === VIEW_ORDER
+                ? "border-indigo-600 text-indigo-600"
+                : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+            }`}
+          >
+            By order
+          </button>
+          <button
+            type="button"
+            onClick={() => setViewMode(VIEW_ITEM)}
+            className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
+              viewMode === VIEW_ITEM
+                ? "border-indigo-600 text-indigo-600"
+                : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+            }`}
+          >
+            By item
+          </button>
+        </div>
+
+        {error && viewMode === VIEW_ORDER && (
           <div className="mb-6 rounded-lg bg-red-50 p-4 text-red-700 flex items-center gap-2">
             <AlertCircle size={20} />
             {error}
           </div>
         )}
+        {itemError && viewMode === VIEW_ITEM && (
+          <div className="mb-6 rounded-lg bg-red-50 p-4 text-red-700 flex items-center gap-2">
+            <AlertCircle size={20} />
+            {itemError}
+          </div>
+        )}
 
         {!selectedOrder ? (
-          <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
-            <table className="min-w-full table-auto divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Order</th>
-                  <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Customer</th>
-                  <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Phone</th>
-                  <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Items</th>
-                  <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Total</th>
-                  <th className="px-4 py-4 min-w-[160px] text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Status</th>
-                  <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Date</th>
-                  <th className="px-4 py-4 text-center text-xs font-semibold uppercase tracking-wider text-gray-600">View</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 bg-white">
-                {loading ? (
+          viewMode === VIEW_ORDER ? (
+            <div className="overflow-x-auto rounded-xl border border-gray-200 bg-white shadow-sm">
+              <table className="min-w-full table-auto divide-y divide-gray-200">
+                <thead className="bg-gray-50">
                   <tr>
-                    <td colSpan={8} className="py-16 text-center text-gray-500">
-                      Loading orders…
-                    </td>
+                    <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Order</th>
+                    <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Customer</th>
+                    <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Phone</th>
+                    <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Items</th>
+                    <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Total</th>
+                    <th className="px-4 py-4 min-w-[160px] text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Status</th>
+                    <th className="px-4 py-4 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Date</th>
+                    <th className="px-4 py-4 text-center text-xs font-semibold uppercase tracking-wider text-gray-600">View</th>
                   </tr>
-                ) : orders.length === 0 ? (
-                  <tr>
-                    <td colSpan={8} className="py-16 text-center text-gray-500">
-                      No orders found
-                    </td>
-                  </tr>
-                ) : (
-                  orders.map((order) => (
-                    <tr key={order._id} className="hover:bg-gray-50/70 transition-colors">
-                      <td className="break-words px-4 py-4 font-medium text-indigo-600">
-                        #{order.orderId || order._id?.slice(-8).toUpperCase()}
+                </thead>
+                <tbody className="divide-y divide-gray-100 bg-white">
+                  {loading ? (
+                    <tr>
+                      <td colSpan={8} className="py-16 text-center text-gray-500">
+                        Loading orders…
                       </td>
-                      <td className="px-4 py-4">
-                        <div className="text-sm font-medium text-gray-900">
-                          {order.user?.name || order.address?.name || "—"}
-                        </div>
+                    </tr>
+                  ) : orders.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="py-16 text-center text-gray-500">
+                        No orders found
                       </td>
-                      <td className="px-4 py-4 text-sm text-gray-700">
-                        {order.user?.countryCode || ""}
-                        {order.user?.phoneNumber || order.address?.phone || "—"}
-                      </td>
-                      <td className="px-4 py-4 text-sm text-gray-600">
-                        {order.totalItems || order.totalQuantity || order.items?.length || "?"}
-                      </td>
-                      <td className="px-4 py-4 text-sm font-medium text-gray-900">
-                        ₹{(order.totalAmount || order.pricing?.finalPayable || 0).toLocaleString("en-IN")}
-                      </td>
-                      <td className="px-4 py-4 min-w-[160px]">
-                        {getStatusBadge(order.status || order.orderStatus)}
-                      </td>
-                      <td className="px-4 py-4 text-sm text-gray-500">
-                        {new Date(order.createdAt).toLocaleDateString("en-IN", {
-                          day: "numeric",
-                          month: "short",
-                          year: "numeric",
-                        })}
-                      </td>
-                      <td className="px-4 py-4 text-center">
-                        <button
+                    </tr>
+                  ) : (
+                    orders.map((order) => (
+                      <tr key={order._id} className="hover:bg-gray-50/70 transition-colors">
+                        <td className="break-words px-4 py-4 font-medium text-indigo-600">
+                          #{order.orderId || order._id?.slice(-8).toUpperCase()}
+                        </td>
+                        <td className="px-4 py-4">
+                          <div className="text-sm font-medium text-gray-900">
+                            {order.user?.name || order.address?.name || "—"}
+                          </div>
+                        </td>
+                        <td className="px-4 py-4 text-sm text-gray-700">
+                          {order.user?.countryCode || ""}
+                          {order.user?.phoneNumber || order.address?.phone || "—"}
+                        </td>
+                        <td className="px-4 py-4 text-sm text-gray-600">
+                          {order.totalItems || order.totalQuantity || order.items?.length || "?"}
+                        </td>
+                        <td className="px-4 py-4 text-sm font-medium text-gray-900">
+                          ₹{(order.totalAmount || order.pricing?.finalPayable || 0).toLocaleString("en-IN")}
+                        </td>
+                        <td className="px-4 py-4 min-w-[160px]">
+                          {getStatusBadge(order.status || order.orderStatus)}
+                        </td>
+                        <td className="px-4 py-4 text-sm text-gray-500">
+                          {new Date(order.createdAt).toLocaleDateString("en-IN", {
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric",
+                          })}
+                        </td>
+                        <td className="px-4 py-4 text-center">
+                          <button
                           onClick={() => {
                             const customOrderId = order.orderId;
                             if (!customOrderId) {
                               setError("Order is missing valid orderId");
                               return;
                             }
+                            setSelectedItemIdFromListView(null);
                             setItemPage(1);
                             fetchSingleOrder(customOrderId);
                           }}
+                            className="rounded-lg p-2 text-indigo-600 hover:bg-indigo-50 hover:text-indigo-800 transition"
+                            title="View order details"
+                          >
+                            <Eye size={18} />
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+              <div className="flex items-center justify-between border-t border-gray-200 px-5 py-4">
+                <div className="text-sm text-gray-700">
+                  Page <span className="font-medium">{pagination.page}</span> of{" "}
+                  <span className="font-medium">{pagination.totalPages || 1}</span>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    disabled={pagination.page <= 1 || loading}
+                    onClick={() => setPagination((p) => ({ ...p, page: Math.max(1, p.page - 1) }))}
+                    className="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-4 py-2 text-sm disabled:opacity-50 hover:bg-gray-50"
+                  >
+                    <ChevronLeft size={16} /> Prev
+                  </button>
+                  <button
+                    disabled={pagination.page >= pagination.totalPages || loading}
+                    onClick={() => setPagination((p) => ({ ...p, page: p.page + 1 }))}
+                    className="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-4 py-2 text-sm disabled:opacity-50 hover:bg-gray-50"
+                  >
+                    Next <ChevronRight size={16} />
+                  </button>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="mb-4 flex flex-wrap items-center gap-3">
+                <span className="text-sm text-gray-600">Item status:</span>
+                <select
+                  value={itemStatusFilter}
+                  onChange={(e) => {
+                    setItemStatusFilter(e.target.value);
+                    setItemPagination((p) => ({ ...p, page: 1 }));
+                  }}
+                  className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm focus:border-indigo-500 focus:ring-indigo-500"
+                >
+                  <option value="">All</option>
+                  {statusOptions.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              {itemLoading ? (
+                <div className="py-16 text-center text-gray-500 rounded-xl border border-gray-200 bg-white">
+                  Loading order items…
+                </div>
+              ) : orderItems.length === 0 ? (
+                <div className="py-16 text-center text-gray-500 rounded-xl border border-gray-200 bg-white">
+                  No order items found
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {orderItems.map((row) => (
+                    <div
+                      key={`${row.orderId}-${row.itemId}`}
+                      className="rounded-xl border border-gray-200 bg-white shadow-sm hover:shadow-md transition-shadow p-5 flex flex-wrap items-center gap-4 sm:gap-6"
+                    >
+                      <div className="flex-1 min-w-0 space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-sm font-medium text-indigo-600">#{row.orderId}</span>
+                          <span className="text-gray-400">·</span>
+                          <span className="text-sm text-gray-600">
+                            {row.user?.name || row.address?.name || "—"}
+                          </span>
+                          <span className="text-xs text-gray-400">
+                            {row.user?.countryCode || ""}{row.user?.phoneNumber || "—"}
+                          </span>
+                        </div>
+                        <div className="text-sm font-medium text-gray-900">
+                          {row.item?.name || row.item?.sku || "—"}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          SKU: {row.item?.sku ?? row.itemId ?? "—"}
+                          {row.item?.variant?.color && ` · ${row.item.variant.color}`}
+                          {row.item?.variant?.size && ` · ${row.item.variant.size}`}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {row.orderCreatedAt
+                            ? new Date(row.orderCreatedAt).toLocaleDateString("en-IN", {
+                                day: "numeric",
+                                month: "short",
+                                year: "numeric",
+                              })
+                            : "—"}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3 shrink-0">
+                        <span className="text-sm text-gray-700">Qty: {row.item?.quantity ?? "—"}</span>
+                        {/* Item-based status only (no order status) */}
+                        {getStatusBadge(row.itemStatus)}
+                        <button
+                          onClick={() => {
+                            if (!row.orderId) return;
+                            setSelectedItemIdFromListView(String(row.itemId ?? row.productItemId ?? ""));
+                            setItemPage(1);
+                            fetchSingleOrder(row.orderId);
+                          }}
                           className="rounded-lg p-2 text-indigo-600 hover:bg-indigo-50 hover:text-indigo-800 transition"
-                          title="View order details"
+                          title="View item details"
                         >
                           <Eye size={18} />
                         </button>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-            <div className="flex items-center justify-between border-t border-gray-200 px-5 py-4">
-              <div className="text-sm text-gray-700">
-                Page <span className="font-medium">{pagination.page}</span> of{" "}
-                <span className="font-medium">{pagination.totalPages || 1}</span>
-              </div>
-              <div className="flex gap-2">
-                <button
-                  disabled={pagination.page <= 1 || loading}
-                  onClick={() => setPagination((p) => ({ ...p, page: Math.max(1, p.page - 1) }))}
-                  className="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-4 py-2 text-sm disabled:opacity-50 hover:bg-gray-50"
-                >
-                  <ChevronLeft size={16} /> Prev
-                </button>
-                <button
-                  disabled={pagination.page >= pagination.totalPages || loading}
-                  onClick={() => setPagination((p) => ({ ...p, page: p.page + 1 }))}
-                  className="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-4 py-2 text-sm disabled:opacity-50 hover:bg-gray-50"
-                >
-                  Next <ChevronRight size={16} />
-                </button>
-              </div>
-            </div>
-          </div>
-        ) : (
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {!itemLoading && orderItems.length > 0 && (
+                <div className="mt-6 flex items-center justify-between border-t border-gray-200 pt-4">
+                  <div className="text-sm text-gray-700">
+                    Page <span className="font-medium">{itemPagination.page}</span> of{" "}
+                    <span className="font-medium">{itemPagination.totalPages || 1}</span>
+                    {itemPagination.total != null && (
+                      <span className="ml-2 text-gray-500">
+                        ({itemPagination.total} item{itemPagination.total !== 1 ? "s" : ""})
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      disabled={itemPagination.page <= 1 || itemLoading}
+                      onClick={() => {
+                        setItemPagination((p) => ({ ...p, page: Math.max(1, p.page - 1) }));
+                      }}
+                      className="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-4 py-2 text-sm disabled:opacity-50 hover:bg-gray-50"
+                    >
+                      <ChevronLeft size={16} /> Prev
+                    </button>
+                    <button
+                      disabled={itemPagination.page >= itemPagination.totalPages || itemLoading}
+                      onClick={() => {
+                        setItemPagination((p) => ({ ...p, page: p.page + 1 }));
+                      }}
+                      className="inline-flex items-center gap-1 rounded-lg border border-gray-300 px-4 py-2 text-sm disabled:opacity-50 hover:bg-gray-50"
+                    >
+                      Next <ChevronRight size={16} />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
+          )
+        ) : (() => {
+          const fromItemList = Boolean(selectedItemIdFromListView);
+          const focusedItem = fromItemList && selectedOrder?.items
+            ? selectedOrder.items.find((it) => String(it.itemId || it._id) === selectedItemIdFromListView)
+            : null;
+
+          return (
           <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
             {/* Header */}
             <div className="border-b bg-gray-50 px-6 py-5">
@@ -644,63 +865,72 @@ const Orders = () => {
                   setOrderError(null);
                   setSelectedItemIds([]);
                   setBulkStatus("");
+                  setSelectedItemIdFromListView(null);
                 }}
                 className="mb-3 text-sm font-medium text-indigo-600 hover:text-indigo-800 flex items-center gap-1.5"
               >
-                ← Back to orders list
+                ← Back to {viewMode === VIEW_ITEM ? "order items" : "orders list"}
               </button>
 
-              <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-900">
-                    Order #{selectedOrder?.orderId || "—"}
-                  </h2>
-                  <p className="text-sm text-gray-600 mt-1 flex items-center gap-2">
-                    <Clock size={16} />
-                    {new Date(selectedOrder?.createdAt).toLocaleString("en-IN", {
-                      dateStyle: "medium",
-                      timeStyle: "short",
-                    })}
-                  </p>
+              {fromItemList ? (
+                /* Item-based flow: minimal header, no order status */
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-900">
+                      Item details · Order #{selectedOrder?.orderId || "—"}
+                    </h2>
+                    <p className="text-sm text-gray-500 mt-0.5">
+                      {selectedOrder?.userId?.name || selectedOrder?.address?.name || "—"}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedItemIdFromListView(null)}
+                    className="text-sm font-medium text-indigo-600 hover:text-indigo-800"
+                  >
+                    View full order (all items)
+                  </button>
                 </div>
-
-                <div className="flex flex-wrap items-center gap-4">
-                  {getStatusBadge(selectedOrder?.status)}
-
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <label className="text-sm text-gray-700 whitespace-nowrap">
-                      Update all items:
-                    </label>
-                    <select
-                      value={wholeOrderNewStatus}
-                      onChange={(e) => setWholeOrderNewStatus(e.target.value)}
-                      disabled={updatingWholeOrder}
-                      className="min-w-[160px] rounded border border-gray-300 px-3 py-1.5 text-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:opacity-60"
-                    >
-                      <option value="">Select status…</option>
-                      {statusOptions.map((opt) => (
-                        <option key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
-                    <button
-                      onClick={handleUpdateWholeOrderStatus}
-                      disabled={updatingWholeOrder || !wholeOrderNewStatus}
-                      className="rounded-lg bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60 flex items-center gap-2"
-                    >
-                      {updatingWholeOrder ? (
-                        <>
-                          <RefreshCw size={14} className="animate-spin" />
-                          Applying…
-                        </>
-                      ) : (
-                        "Apply to all"
-                      )}
-                    </button>
+              ) : (
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                  <div>
+                    <h2 className="text-2xl font-bold text-gray-900">
+                      Order #{selectedOrder?.orderId || "—"}
+                    </h2>
+                    <p className="text-sm text-gray-600 mt-1 flex items-center gap-2">
+                      <Clock size={16} />
+                      {new Date(selectedOrder?.createdAt).toLocaleString("en-IN", {
+                        dateStyle: "medium",
+                        timeStyle: "short",
+                      })}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-4">
+                    {getStatusBadge(selectedOrder?.status)}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <label className="text-sm text-gray-700 whitespace-nowrap">Update all items:</label>
+                      <select
+                        value={wholeOrderNewStatus}
+                        onChange={(e) => setWholeOrderNewStatus(e.target.value)}
+                        disabled={updatingWholeOrder}
+                        className="min-w-[160px] rounded border border-gray-300 px-3 py-1.5 text-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:opacity-60"
+                      >
+                        <option value="">Select status…</option>
+                        {statusOptions.map((opt) => (
+                          <option key={opt.value} value={opt.value}>{opt.label}</option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={handleUpdateWholeOrderStatus}
+                        disabled={updatingWholeOrder || !wholeOrderNewStatus}
+                        className="rounded-lg bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-60 flex items-center gap-2"
+                      >
+                        {updatingWholeOrder ? (<><RefreshCw size={14} className="animate-spin" />Applying…</>) : "Apply to all"}
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
 
             {orderError && (
@@ -710,6 +940,96 @@ const Orders = () => {
               </div>
             )}
 
+            {fromItemList && focusedItem ? (
+              /* Item-based flow: only this item's status and details */
+              <div className="p-6">
+                <div className="max-w-2xl rounded-xl border border-gray-200 bg-gray-50/50 p-6 space-y-6">
+                  <div className="flex flex-wrap items-start gap-4">
+                    {focusedItem.variant?.imageUrl && (
+                      <img
+                        src={focusedItem.variant.imageUrl}
+                        alt={focusedItem.sku}
+                        className="h-24 w-24 rounded-lg object-cover border border-gray-200"
+                      />
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-indigo-600">Order #{selectedOrder?.orderId}</div>
+                      <div className="text-lg font-semibold text-gray-900 mt-0.5">
+                        {focusedItem.sku || focusedItem.variant?.sku || "—"}
+                      </div>
+                      <div className="text-sm text-gray-600 mt-1">
+                        {focusedItem.variant?.color && `Color: ${focusedItem.variant.color}`}
+                        {focusedItem.variant?.size && ` · Size: ${focusedItem.variant.size}`}
+                      </div>
+                      <div className="mt-2 text-sm text-gray-700">
+                        Qty: {focusedItem.quantity} · ₹{(focusedItem.unitPrice || 0).toLocaleString("en-IN")} each
+                      </div>
+                    </div>
+                    <div className="shrink-0">
+                      <span className="text-sm text-gray-600 block mb-1">Item status</span>
+                      {getStatusBadge(focusedItem.status)}
+                    </div>
+                  </div>
+                  {(() => {
+                    const driver = getDriverPartnerDisplay(focusedItem);
+                    return driver ? (
+                      <div className="flex items-center gap-2 rounded-lg bg-indigo-50 border border-indigo-100 px-4 py-3">
+                        <UserCircle size={18} className="text-indigo-600 shrink-0" />
+                        <div>
+                          <span className="text-xs font-medium text-indigo-800 uppercase tracking-wider">Driver partner</span>
+                          <p className="text-sm font-medium text-gray-900 mt-0.5">
+                            {driver.name}
+                            {driver.phone && <span className="text-gray-600 font-normal ml-1">· {driver.phone}</span>}
+                          </p>
+                        </div>
+                      </div>
+                    ) : null;
+                  })()}
+                  <div className="flex flex-wrap items-center gap-3 pt-4 border-t border-gray-200">
+                    <span className="text-sm font-medium text-gray-700">Change item status:</span>
+                    <select
+                      value={focusedItem.status || "CREATED"}
+                      onChange={(e) => {
+                        const newVal = e.target.value;
+                        handleUpdateItemStatus(selectedOrder.orderId, focusedItem.itemId, newVal);
+                      }}
+                      disabled={updatingItemId === String(focusedItem.itemId || focusedItem._id)}
+                      className="rounded border border-gray-300 px-3 py-1.5 text-sm focus:border-indigo-500 focus:ring-indigo-500 disabled:opacity-60"
+                    >
+                      {statusOptions.map((opt) => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
+                    {updatingItemId === String(focusedItem.itemId || focusedItem._id) && (
+                      <RefreshCw size={16} className="animate-spin text-indigo-600" />
+                    )}
+                  </div>
+                  {focusedItem.statusHistory && focusedItem.statusHistory.length > 0 && (
+                    <div className="pt-4 border-t border-gray-200">
+                      <h4 className="text-sm font-semibold text-gray-700 mb-2">Status history</h4>
+                      <ul className="space-y-1.5 text-sm">
+                        {focusedItem.statusHistory.map((h, i) => (
+                          <li key={i} className="flex flex-wrap items-center gap-2 text-gray-600">
+                            <span className="font-medium text-gray-800">{h.status}</span>
+                            {h.previousStatus && <span className="text-gray-400">← {h.previousStatus}</span>}
+                            {h.notes && <span className="text-gray-500">· {h.notes}</span>}
+                            {h.createdAt && (
+                              <span className="text-gray-400 text-xs">
+                                {new Date(h.createdAt).toLocaleString("en-IN")}
+                              </span>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : fromItemList && orderLoading ? (
+              <div className="p-12 text-center text-gray-500">Loading item details…</div>
+            ) : fromItemList && !focusedItem ? (
+              <div className="p-6 text-center text-gray-500">Item not found in this order.</div>
+            ) : !fromItemList ? (
             <div className="p-6 space-y-8">
               {/* Summary Cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -868,6 +1188,7 @@ const Orders = () => {
                           <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Qty</th>
                           <th className="px-5 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Price</th>
                           <th className="px-5 py-3.5 min-w-[160px] text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Status</th>
+                          <th className="px-5 py-3.5 min-w-[140px] text-left text-xs font-semibold uppercase tracking-wider text-gray-600">Driver partner</th>
                           <th className="px-5 py-3.5 text-center text-xs font-semibold uppercase tracking-wider text-gray-600">Change Status</th>
                         </tr>
                       </thead>
@@ -876,6 +1197,7 @@ const Orders = () => {
                           const itemId = String(item.itemId || item._id);
                           const isUpdating = updatingItemId === itemId;
                           const isSelected = selectedItemIds.includes(itemId);
+                          const driverDisplay = getDriverPartnerDisplay(item);
                           return (
                             <tr key={itemId} className={`hover:bg-gray-50/60 ${isSelected ? "bg-indigo-50/50" : ""}`}>
                               <td className="px-4 py-4">
@@ -913,6 +1235,19 @@ const Orders = () => {
                               <td className="px-5 py-4 min-w-[160px]">
                                 {getStatusBadge(item.status)}
                               </td>
+                              <td className="px-5 py-4 min-w-[140px] text-sm text-gray-700">
+                                {driverDisplay ? (
+                                  <span className="inline-flex items-center gap-1.5">
+                                    <UserCircle size={14} className="text-indigo-600 shrink-0" />
+                                    {driverDisplay.name}
+                                    {driverDisplay.phone && (
+                                      <span className="text-gray-500 text-xs">· {driverDisplay.phone}</span>
+                                    )}
+                                  </span>
+                                ) : (
+                                  <span className="text-gray-400">—</span>
+                                )}
+                              </td>
                               <td className="whitespace-nowrap px-5 py-4 text-center">
                                 <div className="relative inline-block">
                                   <select
@@ -947,36 +1282,12 @@ const Orders = () => {
                   </div>
                 )}
 
-                {selectedOrder?.itemsPagination?.total > itemLimit && (
-                  <div className="mt-6 flex items-center justify-center gap-4">
-                    <button
-                      disabled={itemPage <= 1 || orderLoading}
-                      onClick={() => {
-                        setItemPage((p) => Math.max(1, p - 1));
-                        fetchSingleOrder(selectedOrder.orderId);
-                      }}
-                      className="rounded-lg border border-gray-300 px-4 py-2 text-sm disabled:opacity-50 hover:bg-gray-50"
-                    >
-                      Previous
-                    </button>
-                    <span className="text-sm text-gray-700">
-                      Page {itemPage} of {selectedOrder.itemsPagination?.totalPages || 1}
-                    </span>
-                    <button
-                      disabled={itemPage >= (selectedOrder.itemsPagination?.totalPages || 1) || orderLoading}
-                      onClick={() => {
-                        setItemPage((p) => p + 1);
-                        fetchSingleOrder(selectedOrder.orderId);
-                      }}
-                      className="rounded-lg border border-gray-300 px-4 py-2 text-sm disabled:opacity-50 hover:bg-gray-50"
-                    >
-                      Next
-                    </button>
-                  </div>
-                )}
               </div>
             </div>
+            ) : null}
           </div>
+        );
+        })()}
         )}
 
         {/* Assignment Modal */}

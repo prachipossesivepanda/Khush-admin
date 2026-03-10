@@ -144,6 +144,9 @@ export default function AssignmentDetails() {
       const updated = Array.isArray(list) ? list.find((a) => String(a._id) === String(assignmentId)) : null;
       setAssignment(updated || null);
       console.log("[AssignmentDetails] Action success", { actionName, newStatus: updated?.status });
+      if (updated?.status === "DELIVERED") {
+        navigate("/driver/dashboard");
+      }
     } catch (err) {
       setError(typeof err === "string" ? err : "Action failed");
       console.log("[AssignmentDetails] Action failed", { actionName, err: typeof err === "string" ? err : err?.message });
@@ -393,7 +396,7 @@ export default function AssignmentDetails() {
               </button>
             </>
           )}
-          {(status === "ACCEPTED" || status === "ASSIGNED") && (
+          {status === "ACCEPTED" && (
             <button
               onClick={() => runAction(markPickup)}
               disabled={actionLoading}

@@ -16,9 +16,10 @@ export default function OrderHistory() {
     setError("");
     getOrderHistory(1, 20)
       .then((res) => {
-        console.log("[Driver OrderHistory] getOrderHistory response", { res: res?.data ?? res });
-        const payload = (res?.data ?? res)?.data ?? res;
         if (cancelled) return;
+        console.log("[Driver OrderHistory] getOrderHistory response", { res: res?.data ?? res });
+        const raw = res?.data ?? res;
+        const payload = raw?.data ?? raw;
         const listData = Array.isArray(payload?.list) ? payload.list : [];
         const paginationData = payload?.pagination ?? { page: 1, limit: 20, total: 0, totalPages: 0 };
         console.log("[Driver OrderHistory] payload", { listLength: listData.length, pagination: paginationData });
