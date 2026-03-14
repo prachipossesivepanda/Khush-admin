@@ -203,7 +203,7 @@ const Sidebar = () => {
                     SubCategories
                   </Link> */}
 
-                  <Link
+                  {/* <Link
                     to="/admin/inventory/central"
                     className={`block px-4 py-2.5 text-gray-400 hover:bg-white hover:text-black transition-all duration-200 text-sm font-medium ${
                       location.pathname.includes("/admin/items")
@@ -212,7 +212,7 @@ const Sidebar = () => {
                     }`}
                   >
                   Central  Stock management
-                  </Link>
+                  </Link> */}
                   <Link
                     to="/admin/stocks"
                     className={`block px-4 py-2.5 text-gray-400 hover:bg-white hover:text-black transition-all duration-200 text-sm font-medium ${
