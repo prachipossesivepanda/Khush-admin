@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { PackageSearch, Warehouse as WarehouseIcon } from "lucide-react";
+import { PackageSearch, Warehouse as WarehouseIcon, Search, Pencil, ChevronLeft, ChevronRight } from "lucide-react";
 import {
   getWarehouses,
   getWarehouseStock,
@@ -7,39 +7,46 @@ import {
 } from "../../apis/Warehouseapi";
 import { getItemsWithSkus } from "../../apis/itemapi";
 
+const STOCK_PAGE_SIZE = 10;
+const ITEM_PAGE_SIZE = 10;
+const LOW_STOCK_THRESHOLD = 10;
+
 export default function Stockmanagement() {
   const [warehouses, setWarehouses] = useState([]);
   const [warehousesLoading, setWarehousesLoading] = useState(true);
   const [warehousesError, setWarehousesError] = useState(null);
-
   const updateFormRef = useRef(null);
 
   const [selectedWarehouseId, setSelectedWarehouseId] = useState("");
   const [selectedWarehouse, setSelectedWarehouse] = useState(null);
 
-  // ── Warehouse Stock ────────────────────────────────────────────────
+  // Warehouse Stock
   const [stock, setStock] = useState([]);
   const [stockLoading, setStockLoading] = useState(false);
   const [stockError, setStockError] = useState(null);
   const [stockSearch, setStockSearch] = useState("");
   const [stockPage, setStockPage] = useState(1);
-  const STOCK_PAGE_SIZE = 15;
   const [stockTotalPages, setStockTotalPages] = useState(1);
+  const [stockTotalItems, setStockTotalItems] = useState(0);
 
-  // ── Add Stock: Items + SKUs catalog ────────────────────────────────
+  // Catalog: Items + SKUs
   const [itemSkuRows, setItemSkuRows] = useState([]);
   const [itemSkuLoading, setItemSkuLoading] = useState(false);
   const [itemSkuError, setItemSkuError] = useState(null);
   const [itemSearch, setItemSearch] = useState("");
   const [itemPage, setItemPage] = useState(1);
-  const ITEM_PAGE_SIZE = 10;
   const [itemTotalPages, setItemTotalPages] = useState(1);
 
-  // Form for updating/adding stock
-  const [stockForm, setStockForm] = useState({
-    sku: "",
-    quantity: "",
-  });
+  // Inline update: which row is being updated (warehouse stock table)
+  const [updatingSku, setUpdatingSku] = useState(null);
+  // Inline quantity inputs for warehouse stock rows (keyed by sku)
+  const [stockEditQty, setStockEditQty] = useState({});
+  // Inline quantity inputs for catalog rows (keyed by row key)
+  const [catalogEditQty, setCatalogEditQty] = useState({});
+  const [updatingCatalogKey, setUpdatingCatalogKey] = useState(null);
+
+  // Top form (optional quick add)
+  const [stockForm, setStockForm] = useState({ sku: "", quantity: "" });
   const [updatingStock, setUpdatingStock] = useState(false);
 
   // ────────────────────────────────────────────────
@@ -79,15 +86,8 @@ export default function Stockmanagement() {
     fetchWarehouses();
   }, []);
 
-  // ────────────────────────────────────────────────
-  // Load items + SKUs (backend search + pagination)
-  // ────────────────────────────────────────────────
+  // Load items + SKUs (catalog)
   useEffect(() => {
-    if (!itemSearch && itemPage === 1 && itemSkuRows.length > 0) {
-      // optional: prevent unnecessary reload on mount if we already have data
-      return;
-    }
-
     const fetchItemsWithSkus = async () => {
       setItemSkuLoading(true);
       setItemSkuError(null);
@@ -142,6 +142,7 @@ export default function Stockmanagement() {
       setStock([]);
       setStockError(null);
       setStockTotalPages(1);
+      setStockTotalItems(0);
       return;
     }
 
@@ -160,11 +161,30 @@ export default function Stockmanagement() {
           stockSearch
         );
 
-        const data = response?.data?.data || response?.data || {};
-        setStock(data.stock || data.items || data || []);
+        // API returns { success, message, data: { data: [ ... ] } } or { data: [ ... ] }
+        const resData = response?.data ?? response;
+        const list = Array.isArray(resData)
+          ? resData
+          : Array.isArray(resData?.data)
+            ? resData.data
+            : resData?.stock || resData?.items || [];
+        const safeList = Array.isArray(list) ? list : [];
+        setStock(safeList);
 
-        const pagination = data.pagination || {};
-        setStockTotalPages(pagination.totalPages || pagination.pages || 1);
+        const pagination = (resData && !Array.isArray(resData) ? resData.pagination : null) || {};
+        const totalFromApi = pagination.total ?? pagination.totalCount;
+        const total = totalFromApi != null ? Number(totalFromApi) : null;
+        let totalPages = pagination.totalPages ?? pagination.pages;
+        if (totalPages == null || totalPages === undefined) {
+          totalPages = total != null && total > 0
+            ? Math.ceil(total / STOCK_PAGE_SIZE)
+            : safeList.length >= STOCK_PAGE_SIZE
+              ? stockPage + 1
+              : stockPage;
+        }
+        const inferredTotal = total != null ? total : (stockPage - 1) * STOCK_PAGE_SIZE + safeList.length;
+        setStockTotalItems(inferredTotal);
+        setStockTotalPages(Math.max(1, totalPages));
       } catch (err) {
         console.error("Failed to load warehouse stock:", err);
         setStockError(
@@ -188,15 +208,8 @@ export default function Stockmanagement() {
     setStockSearch("");
     setStockPage(1);
     setStockForm({ sku: "", quantity: "" });
-  };
-
-  const handleRowClick = (item) => {
-    if (!item) return;
-    setStockForm((prev) => ({
-      ...prev,
-      sku: item.sku || item.SKU || prev.sku,
-    }));
-    updateFormRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    setStockEditQty({});
+    setCatalogEditQty({});
   };
 
   const handleUpdateStock = async () => {
@@ -204,31 +217,24 @@ export default function Stockmanagement() {
       alert("Please select a warehouse first");
       return;
     }
-
     const sku = stockForm.sku.trim();
     const quantity = Number(stockForm.quantity);
-
     if (!sku || Number.isNaN(quantity)) {
       alert("Please enter a valid SKU and quantity");
       return;
     }
-
     setUpdatingStock(true);
     try {
       await updateWarehouseStock(selectedWarehouseId, { sku, quantity });
-
-      // Refresh current page (or go to page 1)
-      const response = await getWarehouseStock(
-        selectedWarehouseId,
-        1,
-        STOCK_PAGE_SIZE,
-        stockSearch
-      );
-      const data = response?.data?.data || response?.data || {};
-      setStock(data.stock || data.items || data || []);
-      setStockPage(1);
-      setStockTotalPages(data.pagination?.totalPages || 1);
-
+      const response = await getWarehouseStock(selectedWarehouseId, stockPage, STOCK_PAGE_SIZE, stockSearch);
+      const resData = response?.data ?? response;
+      const list = Array.isArray(resData) ? resData : resData?.data ?? resData?.stock ?? resData?.items ?? [];
+      setStock(Array.isArray(list) ? list : []);
+      const pagination = (resData && !Array.isArray(resData) ? resData.pagination : null) || {};
+      const total = pagination.total ?? pagination.totalCount;
+      if (total != null) setStockTotalItems(Number(total));
+      const totalPages = pagination.totalPages ?? pagination.pages ?? (total > 0 ? Math.ceil(Number(total) / STOCK_PAGE_SIZE) : 1);
+      setStockTotalPages(Math.max(1, totalPages));
       setStockForm({ sku: "", quantity: "" });
     } catch (err) {
       console.error("Failed to update stock:", err);
@@ -238,51 +244,103 @@ export default function Stockmanagement() {
     }
   };
 
+  const handleUpdateStockFromRow = async (item) => {
+    if (!selectedWarehouseId) return;
+    const sku = item.sku || item.SKU || "";
+    const quantity = Number(stockEditQty[sku] ?? item.quantity ?? 0);
+    if (!sku || Number.isNaN(quantity) || quantity < 0) {
+      alert("Enter a valid quantity");
+      return;
+    }
+    setUpdatingSku(sku);
+    try {
+      await updateWarehouseStock(selectedWarehouseId, { sku, quantity });
+      const response = await getWarehouseStock(selectedWarehouseId, stockPage, STOCK_PAGE_SIZE, stockSearch);
+      const resData = response?.data ?? response;
+      const list = Array.isArray(resData) ? resData : resData?.data ?? resData?.stock ?? resData?.items ?? [];
+      setStock(Array.isArray(list) ? list : []);
+      const pagination = (resData && !Array.isArray(resData) ? resData.pagination : null) || {};
+      const total = pagination.total ?? pagination.totalCount;
+      if (total != null) setStockTotalItems(Number(total));
+      const totalPages = pagination.totalPages ?? pagination.pages ?? (total > 0 ? Math.ceil(Number(total) / STOCK_PAGE_SIZE) : 1);
+      setStockTotalPages(Math.max(1, totalPages));
+      setStockEditQty((prev) => ({ ...prev, [sku]: undefined }));
+    } catch (err) {
+      alert(err?.response?.data?.message || "Failed to update stock");
+    } finally {
+      setUpdatingSku(null);
+    }
+  };
+
+  const handleUpdateQuantityFromCatalog = async (row, rowKey) => {
+    if (!selectedWarehouseId) {
+      alert("Select a warehouse first to update quantity.");
+      return;
+    }
+    const key = rowKey ?? `${row.itemId}-${row.sku}`;
+    const quantity = Number(catalogEditQty[key] ?? 0);
+    if (Number.isNaN(quantity) || quantity < 0) {
+      alert("Enter a valid quantity");
+      return;
+    }
+    setUpdatingCatalogKey(key);
+    try {
+      await updateWarehouseStock(selectedWarehouseId, { sku: row.sku, quantity });
+      setCatalogEditQty((prev) => ({ ...prev, [key]: undefined }));
+      const response = await getWarehouseStock(selectedWarehouseId, stockPage, STOCK_PAGE_SIZE, stockSearch);
+      const resData = response?.data ?? response;
+      const list = Array.isArray(resData) ? resData : resData?.data ?? resData?.stock ?? resData?.items ?? [];
+      setStock(Array.isArray(list) ? list : []);
+    } catch (err) {
+      alert(err?.response?.data?.message || "Failed to update quantity");
+    } finally {
+      setUpdatingCatalogKey(null);
+    }
+  };
+
   return (
-    <div className="w-full min-h-screen bg-white">
-      {/* Header */}
+    <div className="w-full min-h-screen bg-gray-50">
       <div className="sticky top-0 z-10 border-b border-gray-200 bg-white/95 backdrop-blur-sm">
         <div className="px-4 sm:px-6 py-3 sm:py-4 flex items-center gap-3">
-          <div className="h-9 w-9 rounded-lg bg-black text-white flex items-center justify-center">
-            <PackageSearch size={18} />
+          <div className="h-10 w-10 rounded-xl bg-black text-white flex items-center justify-center">
+            <PackageSearch size={20} />
           </div>
           <div>
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-black">
+            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-gray-900">
               Stock Management
             </h1>
             <p className="text-xs sm:text-sm text-gray-500">
-              Select a warehouse and manage SKU-wise stock in one place.
+              Select a warehouse, then update stock from the tables or the form below.
             </p>
           </div>
         </div>
       </div>
 
-      <div className="px-4 sm:px-6 py-4 sm:py-6 space-y-6">
+      <div className="px-4 sm:px-6 py-4 sm:py-6 space-y-6 max-w-7xl mx-auto">
         {/* Warehouse selector */}
-        <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 sm:p-5 flex flex-col md:flex-row gap-4 md:items-center md:justify-between">
+        <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5 flex flex-col md:flex-row gap-4 md:items-center md:justify-between">
           <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-full bg-white border border-gray-200 flex items-center justify-center">
-              <WarehouseIcon size={18} className="text-gray-700" />
+            <div className="h-10 w-10 rounded-xl bg-gray-100 border border-gray-200 flex items-center justify-center">
+              <WarehouseIcon size={20} className="text-gray-700" />
             </div>
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
                 Warehouse
               </p>
               <p className="text-sm font-medium text-gray-900">
-                {selectedWarehouse?.name || "Choose a warehouse"}
+                {selectedWarehouse?.name || "Select a warehouse"}
               </p>
             </div>
           </div>
-
-          <div className="w-full md:w-72">
+          <div className="w-full md:w-80">
             <select
               value={selectedWarehouseId}
               onChange={handleWarehouseChange}
               disabled={warehousesLoading}
-              className="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm focus:border-black focus:ring-1 focus:ring-black disabled:bg-gray-100"
+              className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-black focus:ring-2 focus:ring-black/10 disabled:bg-gray-100"
             >
               <option value="">
-                {warehousesLoading ? "Loading warehouses..." : "Select warehouse"}
+                {warehousesLoading ? "Loading..." : "Select warehouse"}
               </option>
               {warehouses.map((wh) => (
                 <option key={wh.id} value={wh.id}>
@@ -296,52 +354,40 @@ export default function Stockmanagement() {
           </div>
         </div>
 
-        {/* Update stock form */}
+        {/* Quick update form */}
         <div
           ref={updateFormRef}
-          className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5 space-y-4"
+          className="bg-white border border-gray-200 rounded-xl shadow-sm p-4 sm:p-5"
         >
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-            <h2 className="text-base sm:text-lg font-semibold text-gray-900">
-              Update / Add SKU Stock
-            </h2>
-            <p className="text-xs text-gray-500">POST /warehouse/:warehouseId/stock</p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <h2 className="text-base font-semibold text-gray-900 mb-1">Quick update (SKU + quantity)</h2>
+          <p className="text-xs text-gray-500 mb-4">Or use the Update button in each table row below.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <input
               type="text"
               placeholder="SKU (e.g. TL-BLK-S)"
               value={stockForm.sku}
-              onChange={(e) =>
-                setStockForm((prev) => ({ ...prev, sku: e.target.value }))
-              }
-              className="px-4 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-black focus:border-transparent"
+              onChange={(e) => setStockForm((prev) => ({ ...prev, sku: e.target.value }))}
+              className="rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-black focus:ring-2 focus:ring-black/10"
             />
             <input
               type="number"
               placeholder="Quantity"
               min="0"
               value={stockForm.quantity}
-              onChange={(e) =>
-                setStockForm((prev) => ({ ...prev, quantity: e.target.value }))
-              }
-              className="px-4 py-2.5 border rounded-lg text-sm focus:ring-2 focus:ring-black focus:border-transparent"
+              onChange={(e) => setStockForm((prev) => ({ ...prev, quantity: e.target.value }))}
+              className="rounded-xl border border-gray-300 bg-white px-4 py-2.5 text-sm focus:border-black focus:ring-2 focus:ring-black/10"
             />
             <button
               type="button"
               onClick={handleUpdateStock}
               disabled={updatingStock || !selectedWarehouseId}
-              className="inline-flex items-center justify-center gap-2 rounded-lg bg-black px-5 py-2.5 text-sm font-medium text-white hover:bg-gray-900 disabled:opacity-60 disabled:cursor-not-allowed"
+              className="rounded-xl bg-black px-5 py-2.5 text-sm font-medium text-white hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {updatingStock ? "Updating..." : "Update Stock"}
+              {updatingStock ? "Updating..." : "Update stock"}
             </button>
           </div>
-
           {!selectedWarehouseId && (
-            <p className="text-xs text-amber-600">
-              Select a warehouse first to update its stock.
-            </p>
+            <p className="mt-2 text-xs text-amber-600">Select a warehouse first.</p>
           )}
         </div>
 
@@ -350,16 +396,14 @@ export default function Stockmanagement() {
           <div className="border-b border-gray-100 px-4 sm:px-5 py-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-sm sm:text-base font-semibold text-gray-900">
-                Warehouse Stock
+                Warehouse stock
               </h2>
               <p className="text-xs text-gray-500">
-                Search by SKU or product name • click row to autofill SKU
+                Search by SKU or product. Enter new quantity and click Update to save.
               </p>
             </div>
             <div className="relative w-full sm:w-72">
-              <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-gray-400">
-                <PackageSearch size={16} />
-              </span>
+              <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 size-4 text-gray-400" />
               <input
                 type="text"
                 placeholder="Search SKU or product..."
@@ -368,22 +412,22 @@ export default function Stockmanagement() {
                   setStockSearch(e.target.value);
                   setStockPage(1);
                 }}
-                className="w-full rounded-lg border border-gray-300 bg-white pl-9 pr-3 py-2.5 text-sm focus:border-black focus:ring-1 focus:ring-black"
+                className="w-full rounded-xl border border-gray-300 bg-white pl-9 pr-3 py-2.5 text-sm focus:border-black focus:ring-2 focus:ring-black/10"
               />
             </div>
           </div>
 
           <div className="overflow-hidden rounded-b-xl">
             {stockLoading ? (
-              <div className="py-10 text-center text-sm text-gray-500">Loading stock...</div>
+              <div className="py-12 text-center text-sm text-gray-500">Loading stock...</div>
             ) : stockError ? (
-              <div className="py-10 text-center text-sm text-red-600">{stockError}</div>
+              <div className="py-12 text-center text-sm text-red-600">{stockError}</div>
             ) : !selectedWarehouseId ? (
-              <div className="py-10 text-center text-sm text-gray-500">
+              <div className="py-12 text-center text-sm text-gray-500">
                 Select a warehouse to view its stock.
               </div>
             ) : stock.length === 0 ? (
-              <div className="py-10 text-center text-sm text-gray-500">
+              <div className="py-12 text-center text-sm text-gray-500">
                 {stockSearch.trim()
                   ? "No matching stock records found."
                   : "No stock records in this warehouse yet."}
@@ -392,72 +436,102 @@ export default function Stockmanagement() {
               <>
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
+                    <thead className="bg-gray-50/80">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                           SKU
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                           Product
                         </th>
-                        <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 w-32">
+                        <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider w-28">
                           Quantity
+                        </th>
+                        <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider w-36">
+                          New quantity
+                        </th>
+                        <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider w-24">
+                          Action
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {stock.map((item) => (
-                        <tr
-                          key={item._id || item.id || item.sku}
-                          className="hover:bg-gray-50 cursor-pointer"
-                          onClick={() => handleRowClick(item)}
-                        >
-                          <td className="px-4 py-3 text-sm font-medium text-gray-900">
-                            {item.sku || item.SKU || "—"}
-                          </td>
-                          <td className="px-4 py-3 text-sm text-gray-600">
-                            {item.productName || item.name || "—"}
-                          </td>
-                          <td className="px-4 py-3 text-sm font-semibold text-right">
-                            <div className="flex items-center justify-end gap-2">
-                              <span
-                                className={`${
-                                  (item.quantity ?? 0) < 10 ? "text-red-600" : "text-gray-900"
-                                }`}
-                              >
-                                {item.quantity ?? 0}
+                    <tbody className="divide-y divide-gray-100 bg-white">
+                      {stock.map((item) => {
+                        const sku = item.sku || item.SKU || "";
+                        const qty = item.quantity ?? 0;
+                        const isLow = qty < LOW_STOCK_THRESHOLD;
+                        const editVal = stockEditQty[sku] !== undefined ? stockEditQty[sku] : "";
+                        const isUpdating = updatingSku === sku;
+                        return (
+                          <tr
+                            key={item._id || item.id || sku}
+                            className="hover:bg-gray-50/50 transition-colors"
+                          >
+                            <td className="px-4 py-3 text-sm font-medium text-gray-900 font-mono">
+                              {sku || "—"}
+                            </td>
+                            <td className="px-4 py-3 text-sm text-gray-600">
+                              {item.productName || item.name || "—"}
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <span className={`font-semibold ${isLow ? "text-red-600" : "text-gray-900"}`}>
+                                {qty}
                               </span>
-                              {(item.quantity ?? 0) < 10 && (
-                                <span className="px-2 py-0.5 text-xs font-medium text-red-700 bg-red-100 rounded-full">
+                              {isLow && (
+                                <span className="ml-1.5 inline-block px-2 py-0.5 text-xs font-medium text-red-700 bg-red-100 rounded-md">
                                   Low
                                 </span>
                               )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <input
+                                type="number"
+                                min="0"
+                                placeholder={String(qty)}
+                                value={editVal}
+                                onChange={(e) => setStockEditQty((prev) => ({ ...prev, [sku]: e.target.value }))}
+                                className="w-20 rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-sm text-right focus:border-black focus:ring-1 focus:ring-black"
+                              />
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateStockFromRow(item)}
+                                disabled={isUpdating}
+                                className="inline-flex items-center gap-1.5 rounded-lg bg-black px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                <Pencil size={14} />
+                                {isUpdating ? "Updating..." : "Update"}
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
 
-                <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-t border-gray-100 text-xs sm:text-sm text-gray-600">
+                <div className="flex flex-wrap items-center justify-between gap-3 px-4 sm:px-5 py-3 border-t border-gray-100 text-sm text-gray-600 bg-gray-50/50">
                   <span>
-                    Page {stockPage} of {stockTotalPages}
+                    Showing {(stockPage - 1) * STOCK_PAGE_SIZE + 1}–{Math.min(stockPage * STOCK_PAGE_SIZE, stockTotalItems || stock.length)} of {stockTotalItems || stock.length} SKUs
                   </span>
                   <div className="flex items-center gap-2">
+                    <span className="font-medium">Page {stockPage} of {Math.max(1, stockTotalPages)}</span>
                     <button
                       onClick={() => setStockPage((p) => Math.max(1, p - 1))}
-                      disabled={stockPage === 1}
-                      className="px-3 py-1.5 border rounded disabled:opacity-50 hover:bg-gray-50"
+                      disabled={stockPage <= 1}
+                      className="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white p-2 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      aria-label="Previous page"
                     >
-                      Prev
+                      <ChevronLeft size={18} />
                     </button>
                     <button
                       onClick={() => setStockPage((p) => Math.min(stockTotalPages, p + 1))}
                       disabled={stockPage >= stockTotalPages}
-                      className="px-3 py-1.5 border rounded disabled:opacity-50 hover:bg-gray-50"
+                      className="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white p-2 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      aria-label="Next page"
                     >
-                      Next
+                      <ChevronRight size={18} />
                     </button>
                   </div>
                 </div>
@@ -471,16 +545,14 @@ export default function Stockmanagement() {
           <div className="border-b border-gray-100 px-4 sm:px-5 py-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-sm sm:text-base font-semibold text-gray-900">
-                Catalog – Items & SKUs
+                All items & SKUs
               </h2>
               <p className="text-xs text-gray-500">
-                Search items/SKUs • click to copy SKU into update form
+                Set quantity for the selected warehouse. Select a warehouse first to enable update.
               </p>
             </div>
             <div className="relative w-full sm:w-72">
-              <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-gray-400">
-                <PackageSearch size={16} />
-              </span>
+              <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 size-4 text-gray-400" />
               <input
                 type="text"
                 placeholder="Search item name or SKU..."
@@ -489,18 +561,18 @@ export default function Stockmanagement() {
                   setItemSearch(e.target.value);
                   setItemPage(1);
                 }}
-                className="w-full rounded-lg border border-gray-300 bg-white pl-9 pr-3 py-2.5 text-sm focus:border-black focus:ring-1 focus:ring-black"
+                className="w-full rounded-xl border border-gray-300 bg-white pl-9 pr-3 py-2.5 text-sm focus:border-black focus:ring-2 focus:ring-black/10"
               />
             </div>
           </div>
 
           <div className="overflow-hidden rounded-b-xl">
             {itemSkuLoading ? (
-              <div className="py-10 text-center text-sm text-gray-500">Loading catalog...</div>
+              <div className="py-12 text-center text-sm text-gray-500">Loading catalog...</div>
             ) : itemSkuError ? (
-              <div className="py-10 text-center text-sm text-red-600">{itemSkuError}</div>
+              <div className="py-12 text-center text-sm text-red-600">{itemSkuError}</div>
             ) : itemSkuRows.length === 0 ? (
-              <div className="py-10 text-center text-sm text-gray-500">
+              <div className="py-12 text-center text-sm text-gray-500">
                 {itemSearch.trim()
                   ? "No matching items or SKUs found."
                   : "No items/SKUs available in catalog."}
@@ -509,57 +581,82 @@ export default function Stockmanagement() {
               <>
                 <div className="overflow-x-auto">
                   <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
+                    <thead className="bg-gray-50/80">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                           Item
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600">
+                        <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">
                           SKU
+                        </th>
+                        <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider w-32">
+                          Quantity
+                        </th>
+                        <th className="px-4 py-3 text-right text-xs font-semibold text-gray-600 uppercase tracking-wider w-28">
+                          Action
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {itemSkuRows.map((row, idx) => (
-                        <tr
-                          key={`${row.itemId || "i"}-${row.sku}-${idx}`}
-                          className="hover:bg-gray-50 cursor-pointer"
-                          onClick={() => {
-                            setStockForm((prev) => ({ ...prev, sku: row.sku }));
-                            updateFormRef.current?.scrollIntoView({
-                              behavior: "smooth",
-                              block: "center",
-                            });
-                          }}
-                        >
-                          <td className="px-4 py-3 text-sm text-gray-900">{row.itemName}</td>
-                          <td className="px-4 py-3 text-sm font-mono text-gray-700">
-                            {row.sku}
-                          </td>
-                        </tr>
-                      ))}
+                    <tbody className="divide-y divide-gray-100 bg-white">
+                      {itemSkuRows.map((row, idx) => {
+                        const key = `${row.itemId || "i"}-${row.sku}-${idx}`;
+                        const qtyVal = catalogEditQty[key] !== undefined ? catalogEditQty[key] : "";
+                        const isUpdating = updatingCatalogKey === key;
+                        return (
+                          <tr key={key} className="hover:bg-gray-50/50 transition-colors">
+                            <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                              {row.itemName}
+                            </td>
+                            <td className="px-4 py-3 text-sm font-mono text-gray-700">
+                              {row.sku}
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <input
+                                type="number"
+                                min="0"
+                                placeholder="0"
+                                value={qtyVal}
+                                onChange={(e) => setCatalogEditQty((prev) => ({ ...prev, [key]: e.target.value }))}
+                                disabled={!selectedWarehouseId}
+                                className="w-24 rounded-lg border border-gray-300 bg-white px-2.5 py-1.5 text-sm text-right focus:border-black focus:ring-1 focus:ring-black disabled:bg-gray-100 disabled:cursor-not-allowed"
+                              />
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateQuantityFromCatalog(row, key)}
+                                disabled={!selectedWarehouseId || isUpdating}
+                                className="inline-flex items-center gap-1.5 rounded-lg bg-black px-3 py-1.5 text-xs font-medium text-white hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                <Pencil size={14} />
+                                {isUpdating ? "Updating..." : "Update quantity"}
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
 
-                <div className="flex items-center justify-between px-4 sm:px-5 py-3 border-t border-gray-100 text-xs sm:text-sm text-gray-600">
-                  <span>
-                    Page {itemPage} of {itemTotalPages}
-                  </span>
-                  <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center justify-between gap-3 px-4 sm:px-5 py-3 border-t border-gray-100 text-sm text-gray-600 bg-gray-50/50">
+                  <span>Page {itemPage} of {Math.max(1, itemTotalPages)}</span>
+                  <div className="flex items-center gap-1">
                     <button
                       onClick={() => setItemPage((p) => Math.max(1, p - 1))}
                       disabled={itemPage === 1 || itemSkuLoading}
-                      className="px-3 py-1.5 border rounded disabled:opacity-50 hover:bg-gray-50"
+                      className="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white p-2 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      aria-label="Previous page"
                     >
-                      Prev
+                      <ChevronLeft size={18} />
                     </button>
                     <button
                       onClick={() => setItemPage((p) => Math.min(itemTotalPages, p + 1))}
                       disabled={itemPage >= itemTotalPages || itemSkuLoading}
-                      className="px-3 py-1.5 border rounded disabled:opacity-50 hover:bg-gray-50"
+                      className="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white p-2 text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                      aria-label="Next page"
                     >
-                      Next
+                      <ChevronRight size={18} />
                     </button>
                   </div>
                 </div>

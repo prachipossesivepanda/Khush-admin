@@ -14,24 +14,23 @@ const Banner = () => {
   const navigate = useNavigate();
 
   const fetchBanners = async (pageNum = 1) => {
-  setLoading(true);
-  try {
-    const response = await getAllBanners({ page: pageNum, limit });
+    setLoading(true);
+    try {
+      const response = await getAllBanners({ page: pageNum, limit });
 
-    console.log("Banners fetched:", response);
+      console.log("Banners fetched:", response);
 
-    const bannerArray = response?.data?.banners || [];
-    const pagination = response?.data?.pagination || {};
+      const bannerArray = response?.data?.banners || [];
+      const pagination = response?.data?.pagination || {};
 
-    setBanners(bannerArray);
-    setTotalPages(pagination.totalPages || 1);
-
-  } catch (error) {
-    console.error("Failed to fetch banners:", error);
-    alert(error.message || "Something went wrong");
-  }
-  setLoading(false);
-};
+      setBanners(bannerArray);
+      setTotalPages(pagination.totalPages || 1);
+    } catch (error) {
+      console.error("Failed to fetch banners:", error);
+      alert(error.message || "Something went wrong");
+    }
+    setLoading(false);
+  };
 
   useEffect(() => {
     fetchBanners(page);
@@ -85,8 +84,12 @@ const Banner = () => {
           </div>
         ) : banners.length === 0 ? (
           <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-12 text-center">
-            <p className="text-lg font-semibold text-gray-900 mb-2">No banners found</p>
-            <p className="text-sm text-gray-500 mb-6">Create your first banner to get started</p>
+            <p className="text-lg font-semibold text-gray-900 mb-2">
+              No banners found
+            </p>
+            <p className="text-sm text-gray-500 mb-6">
+              Create your first banner to get started
+            </p>
             <button
               onClick={() => navigate("/admin/banner-form")}
               className="inline-flex items-center gap-2 px-5 py-2.5 bg-black hover:bg-gray-900 text-white text-sm font-semibold rounded-lg shadow-sm hover:shadow-md transition-all"
@@ -103,15 +106,33 @@ const Banner = () => {
                 <table className="w-full divide-y divide-gray-200">
                   <thead className="bg-gray-50">
                     <tr>
-                      <th className="px-2 py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider w-8">#</th>
-                      <th className="px-1.5 sm:px-2 py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider w-16 sm:w-20">Desktop</th>
-                      <th className="px-1.5 sm:px-2 py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider hidden md:table-cell w-16 sm:w-20">Mobile</th>
-                      <th className="px-2 py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider">Title</th>
-                      <th className="hidden lg:table-cell px-2 py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider w-32">Description</th>
-                      <th className="hidden xl:table-cell px-2 py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider w-16">Type</th>
-                      <th className="hidden xl:table-cell px-2 py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider w-16">Discount</th>
-                      <th className="hidden 2xl:table-cell px-2 py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider w-24">Navigate</th>
-                      <th className="px-2 py-2.5 text-right text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider w-20 sm:w-24">Actions</th>
+                      <th className="px-2 py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider w-8">
+                        #
+                      </th>
+                      <th className="px-1.5 sm:px-2 py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider w-16 sm:w-20">
+                        Desktop
+                      </th>
+                      <th className="px-1.5 sm:px-2 py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider hidden md:table-cell w-16 sm:w-20">
+                        Mobile
+                      </th>
+                      <th className="px-2 py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider">
+                        Title
+                      </th>
+                      <th className="hidden lg:table-cell px-2 py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider w-32">
+                        Description
+                      </th>
+                      <th className="hidden xl:table-cell px-2 py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider w-16">
+                        Type
+                      </th>
+                      <th className="hidden xl:table-cell px-2 py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider w-16">
+                        Discount
+                      </th>
+                      <th className="hidden 2xl:table-cell px-2 py-2.5 text-left text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider w-24">
+                        Navigate
+                      </th>
+                      <th className="px-2 py-2.5 text-right text-[10px] sm:text-xs font-semibold text-gray-700 uppercase tracking-wider w-20 sm:w-24">
+                        Actions
+                      </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-100">
@@ -129,55 +150,94 @@ const Banner = () => {
                           <td className="px-1.5 sm:px-2 py-2.5">
                             {desktopUrl ? (
                               <div
-                                className="relative group cursor-pointer h-10 w-14 sm:h-12 sm:w-16 rounded overflow-hidden bg-gray-100 border border-gray-200 shadow-sm hover:ring-1 hover:ring-indigo-500 transition-all duration-200"
+                                className="relative group cursor-pointer h-10 w-14 sm:h-12 sm:w-16 rounded overflow-hidden bg-gray-100 border border-gray-200 shadow-sm hover:ring-1 hover:ring-indigo-500 transition-all duration-200 flex items-center justify-center"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  setZoomedImage({ url: desktopUrl, name: `${banner.title} - Desktop` });
+                                  setZoomedImage({
+                                    url: desktopUrl,
+                                    name: `${banner.title} - Desktop`,
+                                  });
                                 }}
                               >
-                                <img
-                                  src={desktopUrl}
-                                  alt={`${banner.title} - Desktop`}
-                                  className="h-full w-full object-cover"
-                                  onError={(e) => (e.target.src = "https://via.placeholder.com/56?text=D")}
-                                />
+                                {desktopUrl.endsWith(".mp4") ? (
+                                  <div className="relative h-full w-full flex items-center justify-center bg-gray-900">
+                                    {/* Optional: show first frame or just a play icon */}
+                                    <span className="text-white text-xs sm:text-sm font-bold">
+                                      ▶
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <img
+                                    src={desktopUrl}
+                                    alt={`${banner.title} - Desktop`}
+                                    className="h-full w-full object-cover"
+                                    onError={(e) =>
+                                      (e.target.src =
+                                        "https://via.placeholder.com/56?text=D")
+                                    }
+                                  />
+                                )}
+
                                 <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/30 rounded transition-all duration-200 opacity-0 group-hover:opacity-100">
                                   <ZoomIn className="h-2.5 w-2.5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
                                 </div>
                               </div>
                             ) : (
                               <div className="h-10 w-14 sm:h-12 sm:w-16 rounded bg-gray-100 border border-gray-200 flex items-center justify-center">
-                                <span className="text-[7px] sm:text-[8px] text-gray-400">No</span>
+                                <span className="text-[7px] sm:text-[8px] text-gray-400">
+                                  No
+                                </span>
                               </div>
                             )}
                           </td>
                           <td className="px-1.5 sm:px-2 py-2.5 hidden md:table-cell">
                             {mobileUrl ? (
                               <div
-                                className="relative group cursor-pointer h-10 w-14 sm:h-12 sm:w-16 rounded overflow-hidden bg-gray-100 border border-gray-200 shadow-sm hover:ring-1 hover:ring-indigo-500 transition-all duration-200"
+                                className="relative group cursor-pointer h-10 w-14 sm:h-12 sm:w-16 rounded overflow-hidden bg-gray-100 border border-gray-200 shadow-sm hover:ring-1 hover:ring-indigo-500 transition-all duration-200 flex items-center justify-center"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  setZoomedImage({ url: mobileUrl, name: `${banner.title} - Mobile` });
+                                  setZoomedImage({
+                                    url: mobileUrl,
+                                    name: `${banner.title} - Mobile`,
+                                  });
                                 }}
                               >
-                                <img
-                                  src={mobileUrl}
-                                  alt={`${banner.title} - Mobile`}
-                                  className="h-full w-full object-cover"
-                                  onError={(e) => (e.target.src = "https://via.placeholder.com/56?text=M")}
-                                />
+                                {mobileUrl.endsWith(".mp4") ? (
+                                  <div className="relative h-full w-full flex items-center justify-center bg-gray-900">
+                                    {/* Optional: show a play icon */}
+                                    <span className="text-white text-xs sm:text-sm font-bold">
+                                      ▶
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <img
+                                    src={mobileUrl}
+                                    alt={`${banner.title} - Mobile`}
+                                    className="h-full w-full object-cover"
+                                    onError={(e) =>
+                                      (e.target.src =
+                                        "https://via.placeholder.com/56?text=M")
+                                    }
+                                  />
+                                )}
+
                                 <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/30 rounded transition-all duration-200 opacity-0 group-hover:opacity-100">
                                   <ZoomIn className="h-2.5 w-2.5 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
                                 </div>
                               </div>
                             ) : (
                               <div className="h-10 w-14 sm:h-12 sm:w-16 rounded bg-gray-100 border border-gray-200 flex items-center justify-center">
-                                <span className="text-[7px] sm:text-[8px] text-gray-400">No</span>
+                                <span className="text-[7px] sm:text-[8px] text-gray-400">
+                                  No
+                                </span>
                               </div>
                             )}
                           </td>
                           <td className="px-2 py-2.5">
-                            <div className="text-xs sm:text-sm font-semibold text-gray-900 truncate max-w-[150px] sm:max-w-none" title={banner.title || ""}>
+                            <div
+                              className="text-xs sm:text-sm font-semibold text-gray-900 truncate max-w-[150px] sm:max-w-none"
+                              title={banner.title || ""}
+                            >
                               {banner.title || "—"}
                             </div>
                             {/* Show mobile image on small screens */}
@@ -187,14 +247,20 @@ const Banner = () => {
                                   className="relative group cursor-pointer h-8 w-12 rounded overflow-hidden bg-gray-100 border border-gray-200 shadow-sm"
                                   onClick={(e) => {
                                     e.stopPropagation();
-                                    setZoomedImage({ url: mobileUrl, name: `${banner.title} - Mobile` });
+                                    setZoomedImage({
+                                      url: mobileUrl,
+                                      name: `${banner.title} - Mobile`,
+                                    });
                                   }}
                                 >
                                   <img
                                     src={mobileUrl}
                                     alt={`${banner.title} - Mobile`}
                                     className="h-full w-full object-cover"
-                                    onError={(e) => (e.target.src = "https://via.placeholder.com/48?text=M")}
+                                    onError={(e) =>
+                                      (e.target.src =
+                                        "https://via.placeholder.com/48?text=M")
+                                    }
                                   />
                                   <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/30 transition-all duration-200 opacity-0 group-hover:opacity-100">
                                     <ZoomIn className="h-2 w-2 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -202,7 +268,9 @@ const Banner = () => {
                                 </div>
                               ) : (
                                 <div className="h-8 w-12 rounded bg-gray-100 border border-gray-200 flex items-center justify-center">
-                                  <span className="text-[6px] text-gray-400">No M</span>
+                                  <span className="text-[6px] text-gray-400">
+                                    No M
+                                  </span>
                                 </div>
                               )}
                             </div>
@@ -221,7 +289,10 @@ const Banner = () => {
                             </div>
                           </td>
                           <td className="hidden lg:table-cell px-2 py-2.5 text-xs text-gray-600">
-                            <div className="line-clamp-2 truncate max-w-[200px]" title={banner.text || ""}>
+                            <div
+                              className="line-clamp-2 truncate max-w-[200px]"
+                              title={banner.text || ""}
+                            >
                               {banner.text || "—"}
                             </div>
                           </td>
@@ -236,11 +307,16 @@ const Banner = () => {
                                 {banner.discount}%
                               </span>
                             ) : (
-                              <span className="text-gray-400 text-[10px]">—</span>
+                              <span className="text-gray-400 text-[10px]">
+                                —
+                              </span>
                             )}
                           </td>
                           <td className="hidden 2xl:table-cell px-2 py-2.5 text-xs text-gray-600">
-                            <div className="truncate max-w-[100px]" title={banner.navigation?.navigate || ""}>
+                            <div
+                              className="truncate max-w-[100px]"
+                              title={banner.navigation?.navigate || ""}
+                            >
                               {banner.navigation?.navigate || "—"}
                             </div>
                           </td>
@@ -255,7 +331,9 @@ const Banner = () => {
                                 title="Edit banner"
                               >
                                 <Edit size={12} className="sm:w-3.5 sm:h-3.5" />
-                                <span className="hidden sm:inline text-[10px]">Edit</span>
+                                <span className="hidden sm:inline text-[10px]">
+                                  Edit
+                                </span>
                               </button>
                               <button
                                 onClick={(e) => {
@@ -265,8 +343,13 @@ const Banner = () => {
                                 className="inline-flex items-center gap-0.5 px-1.5 py-1 text-xs font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded transition-all"
                                 title="Delete banner"
                               >
-                                <Trash2 size={12} className="sm:w-3.5 sm:h-3.5" />
-                                <span className="hidden sm:inline text-[10px]">Delete</span>
+                                <Trash2
+                                  size={12}
+                                  className="sm:w-3.5 sm:h-3.5"
+                                />
+                                <span className="hidden sm:inline text-[10px]">
+                                  Delete
+                                </span>
                               </button>
                             </div>
                           </td>
@@ -283,7 +366,8 @@ const Banner = () => {
               <div className="mt-8 flex flex-col sm:flex-row justify-between items-center gap-4 px-1">
                 <div className="text-sm text-gray-700 font-medium">
                   Showing <span className="font-bold">{banners.length}</span> of{" "}
-                  <span className="font-bold">{totalPages * limit}</span> banners
+                  <span className="font-bold">{totalPages * limit}</span>{" "}
+                  banners
                 </div>
 
                 <div className="flex items-center gap-3">
@@ -314,6 +398,7 @@ const Banner = () => {
       </main>
 
       {/* Image Zoom Modal */}
+      {/* Image / Video Zoom Modal */}
       {zoomedImage && (
         <div
           className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4"
@@ -328,18 +413,26 @@ const Banner = () => {
             <X size={28} />
           </button>
 
-          {/* Zoomed Image Container */}
+          {/* Zoomed Content */}
           <div className="relative w-full h-full flex items-center justify-center">
-            <img
-              src={zoomedImage.url}
-              alt={zoomedImage.name}
-              className="max-w-[95vw] max-h-[90vh] w-auto h-auto object-contain rounded-lg shadow-2xl"
-              onClick={(e) => e.stopPropagation()}
-              style={{ maxWidth: '95vw', maxHeight: '90vh' }}
-            />
+            {zoomedImage.url?.endsWith(".mp4") ? (
+              <video
+                src={zoomedImage.url}
+                controls
+                className="max-w-[95vw] max-h-[90vh] w-auto h-auto object-contain rounded-lg shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+              />
+            ) : (
+              <img
+                src={zoomedImage.url}
+                alt={zoomedImage.name}
+                className="max-w-[95vw] max-h-[90vh] w-auto h-auto object-contain rounded-lg shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+              />
+            )}
           </div>
 
-          {/* Image Name */}
+          {/* File Name */}
           <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 bg-black/80 text-white px-6 py-3 rounded-lg backdrop-blur-sm">
             <p className="text-base font-medium">{zoomedImage.name}</p>
           </div>

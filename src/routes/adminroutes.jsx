@@ -18,6 +18,7 @@ import Filter from "../admin/components/Filter/Filter";
 import FilterForm from "../admin/components/Filter/FilterForm";
 import CategoryForm from "../admin/components/inventory/CategoryForm";
 import SubcategoryForm from "../admin/components/inventory/SubcategoryForm";
+import SubcategoryEditStandalone from "../admin/components/inventory/SubcategoryEditStandalone";
 import ItemForm from "../admin/components/inventory/ItemForm";
 import BrandForm from "../admin/components/Brands/BrandForm";
 import SectionForm from "../admin/components/Section/SectionForm";
@@ -88,9 +89,13 @@ const AdminRoutes = () => {
           element={<SubcategoryForm />}
         />
         <Route
-          path="inventory/subcategories/edit/:id"
+          path="inventory/subcategories/:categoryId/edit/:id"
           element={<SubcategoryForm />}
-        />{" "}
+        />
+        <Route
+          path="inventory/subcategories/edit/:id"
+          element={<SubcategoryEditStandalone />}
+        />
         <Route
           path="inventory/items/:categoryId/:subcategoryId"
           element={<Items />}
